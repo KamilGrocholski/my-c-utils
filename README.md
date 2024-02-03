@@ -4,6 +4,7 @@
 
 - StringBuffer
 - StringView
+- Uri
 
 ## Test
 

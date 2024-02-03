@@ -52,6 +52,15 @@ bool test_sv_sub(StringView src, size_t idx, size_t count,
   return sv_compare(sv_sub(src, idx, count), expected);
 }
 
+void test_sv_trim() {
+  StringView sv = sv_new_from_cstr("    ABCD    ");
+  assert(sv_compare(sv_trim_left(sv), sv_new_from_cstr("ABCD    ")) &&
+         "should sv trim left");
+  assert(sv_compare(sv_trim_right(sv), sv_new_from_cstr("    ABCD")) &&
+         "should sv trim right");
+  assert(sv_compare(sv_trim(sv), sv_new_from_cstr("ABCD")) && "should sv trim");
+}
+
 bool test_sb_new() { return sb_new()->data != NULL; }
 bool test_sb_clear() {
   StringBuffer *sb = sb_new_from_sv(sv_new_from_cstr("AB"));
@@ -162,6 +171,8 @@ void test_string_utils() {
   assert(
       test_sv_sub(sv_new_from_cstr("AB/CD/EF"), 3, 2, sv_new_from_cstr("CD")) &&
       "should sub inrange count");
+
+  test_sv_trim();
 
   // SB
 

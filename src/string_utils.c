@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -98,6 +99,30 @@ bool sv_compare_sb(StringView sv, StringBuffer *sb) {
 StringView sv_sub(StringView sv, size_t idx, size_t count) {
   return sv_new(sv.data + idx, count < sv.len - idx ? count : sv.len - idx);
 }
+
+StringView sv_trim_left(StringView sv) {
+  size_t i = 0;
+  while (i < sv.len && isspace(sv.data[i])) {
+    i++;
+  }
+  return (StringView){
+      .len = sv.len - i,
+      .data = sv.data + i,
+  };
+}
+
+StringView sv_trim_right(StringView sv) {
+  size_t i = sv.len - 1;
+  while (i > 0 && isspace(sv.data[i])) {
+    i--;
+  }
+  return (StringView){
+      .len = i + 1,
+      .data = sv.data,
+  };
+}
+
+StringView sv_trim(StringView sv) { return sv_trim_left(sv_trim_right(sv)); }
 
 char *sv_dup(StringView sv) {
   char *str = malloc(sizeof(char) * sv.len + 1);

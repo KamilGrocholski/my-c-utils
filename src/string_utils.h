@@ -47,6 +47,12 @@ bool sv_compare_sb(StringView sv, StringBuffer *sb);
 
 StringView sv_sub(StringView sv, size_t position, size_t count);
 
+StringView sv_trim_left(StringView sv);
+
+StringView sv_trim_right(StringView sv);
+
+StringView sv_trim(StringView sv);
+
 char *sv_dup(StringView sv);
 
 bool sv_file_read(const char *filename, StringView *sv);

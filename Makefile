@@ -1,9 +1,9 @@
 FLAGS=-Wall -Wextra -pedantic
-SRC_FILES=src/string_utils.c
+SRC_FILES=src/string_utils.c src/linked_list.c src/uri.c
 
 TEST_BIN=test_bin
 TEST_FLAGS=$(FLAGS) -g
-TEST_SRC_FILES=$(SRC_FILES) test/main.c test/string_utils.c
+TEST_SRC_FILES=$(SRC_FILES) test/main.c test/string_utils.c test/linked_list.c test/uri.c
 TEST_OUT_FILE=$(TEST_BIN)/main
  
 .PHONY: test

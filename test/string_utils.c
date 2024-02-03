@@ -26,6 +26,10 @@ bool test_sv_starts_with(StringView src, StringView starts_with,
   return sv_starts_with(src, starts_with) == expected;
 }
 
+bool test_sv_ends_with(StringView src, StringView ends_with, bool expected) {
+  return sv_ends_with(src, ends_with) == expected;
+}
+
 bool test_sv_pop_first_split_by(StringView *src, StringView split_by,
                                 StringView *expected_pops) {
   size_t pops_count = 0;
@@ -124,6 +128,18 @@ void test_string_utils() {
   assert(test_sv_starts_with(sv_new_from_cstr("AB"), sv_new_from_cstr("B"),
                              false) &&
          "should not starts_with");
+
+  assert(test_sv_ends_with(sv_new_from_cstr(""), sv_new_from_cstr(""), true) &&
+         "should ends_with both empty true");
+  assert(
+      test_sv_ends_with(sv_new_from_cstr("AA"), sv_new_from_cstr("AA"), true) &&
+      "should ends_with");
+  assert(
+      test_sv_ends_with(sv_new_from_cstr("AB"), sv_new_from_cstr("B"), true) &&
+      "should ends_with not equal");
+  assert(
+      test_sv_ends_with(sv_new_from_cstr("AB"), sv_new_from_cstr("A"), false) &&
+      "should not ends_with");
 
   StringView expected_pops[] = {
       sv_new_from_cstr("AB"),

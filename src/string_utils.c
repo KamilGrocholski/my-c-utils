@@ -67,7 +67,16 @@ bool sv_is_empty(StringView sv) { return sv.len == 0; }
 bool sv_is_valid_cstr(StringView sv) { return sv.data[sv.len] == '\0'; }
 
 bool sv_starts_with(StringView sv, StringView starts_with) {
+  if (sv.len < starts_with.len)
+    return false;
   return memcmp(sv.data, starts_with.data, starts_with.len) == 0;
+}
+
+bool sv_ends_with(StringView sv, StringView ends_with) {
+  if (sv.len < ends_with.len)
+    return false;
+  return memcmp(sv.data + sv.len - ends_with.len, ends_with.data,
+                ends_with.len) == 0;
 }
 
 bool sv_contains(StringView haystack, StringView needle) {
@@ -219,6 +228,18 @@ bool sb_append(StringBuffer *sb, StringView sv) {
   }
   memcpy((char *)sb->data + sb->len, sv.data, sv.len);
   sb->len += sv.len;
+  ((char *)sb->data)[sb->len] = '\0';
+  return true;
+}
+
+bool sb_append_char(StringBuffer *sb, char ch) {
+  if (sb->len + 1 >= sb->cap) {
+    if (!sb_resize(sb, sb->cap * 2)) {
+      return false;
+    }
+  }
+  ((char *)sb->data)[sb->len] = ch;
+  sb->len += 1;
   ((char *)sb->data)[sb->len] = '\0';
   return true;
 }

@@ -37,6 +37,8 @@ bool sv_is_valid_cstr(StringView sv);
 
 bool sv_starts_with(StringView sv, StringView starts_with);
 
+bool sv_ends_with(StringView sv, StringView ends_with);
+
 bool sv_contains(StringView haystack, StringView needle);
 
 bool sv_compare(StringView a, StringView b);
@@ -74,6 +76,8 @@ bool sb_is_valid_cstr(StringBuffer *sb);
 bool sb_is_empty(StringBuffer *sb);
 
 bool sb_append(StringBuffer *sb, StringView sv);
+
+bool sb_append_char(StringBuffer *sb, char ch);
 
 bool sb_insert(StringBuffer *sb, size_t idx, StringView sv);
 

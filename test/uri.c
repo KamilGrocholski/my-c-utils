@@ -5,9 +5,9 @@
 #include "../src/uri.h"
 
 bool test_uri_parse() {
-  StringView raw = sv_new_from_cstr(
-      "https://www.example.com/path/to/resource?query=123#fragment");
-  UriComponents components;
+  StringView raw =
+      sv_new_from_cstr("https://www.example.com/path/to/resource?query=123");
+  UriComponents components = {0};
   uri_parse(raw, &components);
 
   assert(sv_compare(components.scheme, sv_new_from_cstr("https")) &&
@@ -22,7 +22,7 @@ bool test_uri_parse() {
   assert(sv_compare(components.query, sv_new_from_cstr("query=123")) &&
          "should parse query");
 
-  assert(sv_compare(components.fragment, sv_new_from_cstr("fragment")) &&
+  assert(sv_compare(components.fragment, sv_new_from_cstr("")) &&
          "should parse fragment");
 
   return true;

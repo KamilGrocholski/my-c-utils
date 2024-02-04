@@ -8,12 +8,6 @@
 
 #define DA_INITIAL_CAP 16
 
-typedef struct {
-  size_t len;
-  size_t cap;
-  Allocator *a;
-} DynamicArray;
-
 #define DYNAMIC_ARRAY(T)                                                       \
   struct {                                                                     \
     T *items;                                                                  \
@@ -24,10 +18,11 @@ typedef struct {
 #define DA_REALLOC(items, new_cap) items = realloc(items, new_cap)
 
 #define da_init(da, T)                                                         \
-  da = malloc(sizeof(*da));                                                    \
   da->items = malloc(sizeof(T));                                               \
   da->len = 0;                                                                 \
   da->cap = DA_INITIAL_CAP;
+
+#define da_free(da) free(da->items)
 
 #define da_append(da, item)                                                    \
   if (da->len >= da->cap) {                                                    \

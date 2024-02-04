@@ -1,4 +1,5 @@
 #include "uri.h"
+#include <stdlib.h>
 
 void uri_parse(StringView uri, UriComponents *components) {
   if (sv_is_empty(uri)) {
@@ -72,4 +73,177 @@ StringBuffer *uri_components_join(UriComponents *components) {
   }
 
   return uri;
+}
+
+size_t uri_query_hash(StringView key) {
+  size_t h = 0;
+  while (key.len) {
+    h = 31 * h + *(key.data)++;
+    --key.len;
+  }
+  return h;
+}
+
+UriQueryPairs *uri_query_new() {
+  UriQueryPairs *qp = malloc(sizeof(UriQueryPairs));
+  *qp = (UriQueryPairs){
+      .cap = URI_QUERY_CAP_INIT,
+      .size = 0,
+      .buckets = malloc(sizeof(UriQueryBucket *) * URI_QUERY_CAP_INIT),
+  };
+  return qp;
+}
+
+void uri_query_parse(UriQueryPairs *qp, StringView query) {
+  StringView raw_pair;
+  StringView query_splitter = sv_new("&", 1);
+  StringView pair_splitter = sv_new("=", 1);
+
+  while (!sv_is_empty(query)) {
+    raw_pair = sv_pop_first_split_by(&query, query_splitter);
+    StringView key = sv_pop_first_split_by(&raw_pair, pair_splitter);
+    StringView value = raw_pair;
+    uri_query_set(qp, key, value);
+  }
+}
+
+void uri_query_resize(UriQueryPairs *qp, size_t new_cap) {
+  UriQueryBucket **new_buckets = malloc(sizeof(UriQueryBucket *) * new_cap);
+
+  for (size_t i = 0; i < qp->cap; ++i) {
+    UriQueryBucket *bucket = qp->buckets[i];
+    while (bucket) {
+      UriQueryBucket *next = bucket->next;
+      size_t new_idx = uri_query_hash(bucket->pair.key) % new_cap;
+      bucket->next = new_buckets[new_idx];
+      new_buckets[new_idx] = bucket;
+      bucket = next;
+    }
+  }
+
+  free(qp->buckets);
+
+  qp->buckets = new_buckets;
+  qp->cap = new_cap;
+}
+
+void uri_query_set(UriQueryPairs *qp, StringView key, StringView value) {
+  size_t hash = uri_query_hash(key);
+  size_t idx = hash % qp->cap;
+  UriQueryBucket *new_bucket = malloc(sizeof(UriQueryBucket));
+  *new_bucket = (UriQueryBucket){
+      .next = qp->buckets[idx],
+      .pair =
+          (UriQueryPair){
+              .key = key,
+              .value = value,
+          },
+  };
+
+  qp->buckets[idx] = new_bucket;
+  qp->size++;
+
+  if (qp->size > qp->cap * URI_QUERY_RESIZE_AT) {
+    uri_query_resize(qp, qp->cap * URI_QUERY_CAP_MULT);
+  }
+}
+
+StringView uri_query_get(UriQueryPairs *qp, StringView key) {
+  size_t hash = uri_query_hash(key);
+  size_t idx = hash % qp->cap;
+  UriQueryBucket *bucket = qp->buckets[idx];
+
+  while (bucket) {
+    if (sv_compare(bucket->pair.key, key)) {
+      return bucket->pair.value;
+    }
+    bucket = bucket->next;
+  }
+
+  return sv_new(NULL, 0);
+}
+
+bool uri_query_has(UriQueryPairs *qp, StringView key) {
+  size_t hash = uri_query_hash(key);
+  size_t idx = hash % qp->cap;
+  UriQueryBucket *bucket = qp->buckets[idx];
+
+  while (bucket) {
+    if (sv_compare(bucket->pair.key, key)) {
+      return true;
+    }
+    bucket = bucket->next;
+  }
+
+  return false;
+}
+
+StringView uri_query_remove(UriQueryPairs *qp, StringView key) {
+  size_t hash = uri_query_hash(key);
+  size_t idx = hash % qp->cap;
+  UriQueryBucket *bucket = qp->buckets[idx];
+  UriQueryBucket *prev_bucket = NULL;
+
+  while (bucket) {
+    if (sv_compare(bucket->pair.key, key)) {
+      StringView out = (StringView){
+          .len = bucket->pair.value.len,
+          .data = bucket->pair.value.data,
+      };
+
+      if (prev_bucket) {
+        prev_bucket->next = bucket->next;
+      } else {
+        qp->buckets[idx] = bucket->next;
+      }
+
+      free(bucket);
+
+      qp->size--;
+
+      return out;
+    }
+
+    prev_bucket = bucket;
+    bucket = bucket->next;
+  }
+
+  return sv_new(NULL, 0);
+}
+
+void uri_query_foreach(UriQueryPairs *qp,
+                       void (*callback)(StringView key, StringView value)) {
+  for (size_t i = 0; i < qp->cap; ++i) {
+    UriQueryBucket *bucket = qp->buckets[i];
+    while (bucket) {
+      callback(bucket->pair.key, bucket->pair.value);
+      bucket = bucket->next;
+    }
+  }
+}
+
+void uri_query_free(UriQueryPairs *qp) {
+  for (size_t i = 0; i < qp->cap; ++i) {
+    UriQueryBucket *bucket = qp->buckets[i];
+    while (bucket) {
+      UriQueryBucket *next = bucket->next;
+      free(bucket);
+      bucket = next;
+    }
+  }
+  free(qp->buckets);
+  free(qp);
+}
+
+void uri_query_clear(UriQueryPairs *qp) {
+  for (size_t i = 0; i < qp->cap; ++i) {
+    UriQueryBucket *bucket = qp->buckets[i];
+    while (bucket) {
+      UriQueryBucket *next = bucket->next;
+      free(bucket);
+      bucket = next;
+    }
+    qp->buckets[i] = NULL;
+  }
+  qp->size = 0;
 }

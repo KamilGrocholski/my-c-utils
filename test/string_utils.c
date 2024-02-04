@@ -61,36 +61,54 @@ void test_sv_trim() {
   assert(sv_compare(sv_trim(sv), sv_new_from_cstr("ABCD")) && "should sv trim");
 }
 
-bool test_sb_new() { return sb_new()->data != NULL; }
+bool test_sb_new() {
+  StringBuffer *sb = sb_new();
+  bool out = sb->data != NULL;
+  sb_free(sb);
+  return out;
+}
 bool test_sb_clear() {
   StringBuffer *sb = sb_new_from_sv(sv_new_from_cstr("AB"));
   sb_clear(sb);
-  return sb->len == 0 && sb->data[sb->len] == '\0';
+  bool out = sb->len == 0 && sb->data[sb->len] == '\0';
+  sb_free(sb);
+  return out;
 }
 
 bool test_sb_compare_sv(StringBuffer *sb, StringView sv, bool expected) {
-  return sb_compare_sv(sb, sv) == expected;
+  bool out = sb_compare_sv(sb, sv) == expected;
+  sb_free(sb);
+  return out;
 }
 
 bool test_sb_compare(StringBuffer *a, StringBuffer *b, bool expected) {
-  return sb_compare(a, b) == expected;
+  bool out = sb_compare(a, b) == expected;
+  sb_free(a);
+  sb_free(b);
+  return out;
 }
 
 bool test_sb_append(StringBuffer *src, StringView append, StringView expected) {
   sb_append(src, append);
-  return sb_compare_sv(src, expected);
+  bool out = sb_compare_sv(src, expected);
+  sb_free(src);
+  return out;
 }
 
 bool test_sb_insert(StringBuffer *src, StringView append, size_t idx,
                     StringView expected) {
   sb_insert(src, idx, append);
-  return sb_compare_sv(src, expected);
+  bool out = sb_compare_sv(src, expected);
+  sb_free(src);
+  return out;
 }
 
 bool test_sb_remove(StringBuffer *src, size_t idx, size_t count,
                     StringView expected) {
   sb_remove(src, idx, count);
-  return sb_compare_sv(src, expected);
+  bool out = sb_compare_sv(src, expected);
+  sb_free(src);
+  return out;
 }
 
 void test_string_utils() {

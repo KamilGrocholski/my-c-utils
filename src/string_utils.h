@@ -8,6 +8,11 @@
 
 #define SB_INITIAL_CAP 64
 
+#define SV_FMT "%.*s"
+#define SB_FMT "%.*s"
+#define SV_PRINT(sv) printf(SV_FMT, (int)(sv.len), sv.data)
+#define SB_PRINT(sb) printf(SB_FMT, (int)(sb->len), sb->data)
+
 typedef struct {
   const char *data;
   size_t len;

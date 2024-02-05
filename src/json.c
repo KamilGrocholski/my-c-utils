@@ -90,8 +90,7 @@ Json *json_new() {
 
 void json_free(Json *json) {
   if (json == NULL) {
-    logger_log(LOG_WARNING, "json_free trying to free NULL");
-    exit(1);
+    return;
   }
   switch (json->type) {
   case JSON_ARRAY:
@@ -109,7 +108,7 @@ void json_free(Json *json) {
     free(json);
     break;
   default:
-    logger_log(LOG_ERROR, "invalid json type");
+    logger_log(LOG_ERROR, "json_free invalid json type");
     exit(1);
   }
 }
@@ -301,7 +300,7 @@ JsonObject *json_object_new(size_t size) {
   }
   *o = (JsonObject){
       .size = size,
-      .buckets = malloc(sizeof(JsonObjectPair *) * size),
+      .buckets = calloc(size, sizeof(JsonObjectPair *)),
   };
   if (o->buckets == NULL) {
     logger_log(LOG_ERROR, "json_object_new->buckets mem alloc err");
@@ -363,9 +362,9 @@ void json_object_foreach(JsonObject *o,
 
 void json_object_free(JsonObject *o) {
   for (size_t i = 0; i < o->size; ++i) {
-    JsonObjectPair *curr = o->buckets[i]; // ERROR segf
-    while (curr) {
-      JsonObjectPair *next = curr->next; // ERROR segf
+    JsonObjectPair *curr = o->buckets[i];
+    while (curr != NULL) {
+      JsonObjectPair *next = curr->next;
       json_free(curr->value);
       free(curr);
       curr = next;

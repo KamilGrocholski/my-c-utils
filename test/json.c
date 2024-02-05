@@ -2,13 +2,15 @@
 
 #include "../src/json.h"
 
+void show(StringView key, Json *value) { sv_print(&key); }
+
 void test_json_free() {
-  /* JsonArray *array = json_array_new(); */
-  /* json_array_free(array); */
+  JsonArray *array = json_array_new();
+  json_array_free(array);
   printf("free array\n");
 
-  /* JsonObject *obj = json_object_new(4); */
-  /* json_object_free(obj); */
+  JsonObject *obj = json_object_new(4);
+  json_object_free(obj);
   printf("free object\n");
 }
 
@@ -25,7 +27,7 @@ void test_json_object() {
   StringView str = target->string;
   assert(sv_compare(str, value) && "not equal");
 
-  /* json_free(json); */
+  json_free(json);
 }
 
 void test_json_parse() {
@@ -57,7 +59,7 @@ void test_json_parse() {
   assert(sv_compare(e, json->array->items[4]->array->items[0]->string) &&
          "should e be equal");
 
-  /* json_free(json); */
+  json_free(json);
 }
 
 void test_json() {

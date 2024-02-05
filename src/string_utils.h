@@ -62,6 +62,8 @@ char *sv_dup(StringView sv);
 
 bool sv_file_read(const char *filename, StringView *sv);
 
+void sv_file_free(StringView *file_content);
+
 // SB
 
 bool sb_resize(StringBuffer *sb, size_t new_cap);

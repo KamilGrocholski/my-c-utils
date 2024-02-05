@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "logger.h"
 #include "string_utils.h"
 
 StringView sv_new(const char *data, size_t len) {
@@ -134,6 +135,7 @@ char *sv_dup(StringView sv) {
 bool sv_file_read(const char *filename, StringView *sv) {
   FILE *fh = fopen(filename, "rb");
   if (fh == NULL) {
+    logger_log(LOG_WARNING, "could not open file '%s'", filename);
     return 0;
   }
 
@@ -143,6 +145,7 @@ bool sv_file_read(const char *filename, StringView *sv) {
   char *b = (char *)malloc(sv->len);
 
   if (b == NULL) {
+    logger_log(LOG_ERROR, "mem alloc err not open file '%s'", filename);
     fclose(fh);
     return false;
   }
@@ -165,6 +168,10 @@ bool sv_file_read(const char *filename, StringView *sv) {
 
   fclose(fh);
   return true;
+}
+
+void sv_file_free(StringView *file_content) {
+  free((char *)file_content->data);
 }
 
 bool sb_resize(StringBuffer *sb, size_t new_cap) {

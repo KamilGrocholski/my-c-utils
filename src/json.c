@@ -161,7 +161,8 @@ Json *json_parse_value(Lexer *lexer) {
       } else if (sv_compare(ident, sv_new("false", 5))) {
         value->type = JSON_FALSE;
       } else {
-        logger_log(LOG_ERROR, "invalid keyword");
+        logger_log(LOG_ERROR, "invalid keyword: '%.*s'", (int)ident.len,
+                   ident.data);
         exit(1);
       }
       return value;
@@ -406,13 +407,13 @@ void json_print(Json *json) {
     printf("%f", json->num_double);
     break;
   case JSON_TRUE:
-    printf("%s", "true");
+    printf("true");
     break;
   case JSON_FALSE:
-    printf("%s", "false");
+    printf("false");
     break;
   case JSON_NULL:
-    printf("%s", "null");
+    printf("null");
     break;
   }
 }

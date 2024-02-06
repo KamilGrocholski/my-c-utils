@@ -4,6 +4,12 @@
 #include "json.h"
 #include "logger.h"
 
+// TODO
+// https://www.crockford.com/mckeeman.html
+// correct string parsing
+// numbers add: errors, +/-, hex
+// assert last char is valid
+
 Lexer lexer_new(StringView *input) {
   return (Lexer){
       .input = input,
@@ -117,7 +123,6 @@ void json_free(Json *json) {
     break;
   default:
     logger_log(LOG_FATAL, "json_free invalid json type");
-    exit(1);
   }
 }
 
@@ -126,10 +131,6 @@ bool json_parse(StringView *input, Json *dest) {
   lexer_advance(&lexer);
 
   bool is_success = json_parse_value(&lexer, dest);
-
-  /* if (dest) { */
-  /*   json_free(dest); */
-  /* } */
 
   return is_success;
 }
@@ -493,6 +494,5 @@ void json_print(Json *json) {
     break;
   default:
     logger_log(LOG_FATAL, "json_print invalid type");
-    exit(1);
   }
 }

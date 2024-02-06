@@ -6,6 +6,8 @@
 #include "logger.h"
 #include "string_utils.h"
 
+// TODO better errors
+
 StringView sv_new(const char *data, size_t len) {
   return (StringView){
       .data = data,
@@ -46,12 +48,9 @@ StringView sv_pop_first_split_by(StringView *src, StringView split_by) {
 }
 
 void sv_print(StringView *sv) {
-  printf("\"");
   for (size_t i = 0; i < sv->len; ++i) {
     printf("%c", sv->data[i]);
   }
-  printf("\"");
-  printf("\n");
 }
 
 // replace with kmp
@@ -135,7 +134,7 @@ char *sv_dup(StringView sv) {
 bool sv_file_read(const char *filename, StringView *sv) {
   FILE *fh = fopen(filename, "rb");
   if (fh == NULL) {
-    logger_log(LOG_WARNING, "could not open file '%s'", filename);
+    logger_log(LOG_ERROR, "could not open file '%s'", filename);
     return 0;
   }
 
@@ -185,11 +184,17 @@ bool sb_resize(StringBuffer *sb, size_t new_cap) {
 
 StringBuffer *sb_new() {
   StringBuffer *sb = (StringBuffer *)malloc(sizeof(StringBuffer));
+  if (sb == NULL) {
+    logger_log(LOG_FATAL, "sb_new mem alloc err");
+  }
   *sb = (StringBuffer){
       .data = (char *)malloc(sizeof(char) * SB_INITIAL_CAP),
       .cap = SB_INITIAL_CAP,
       .len = 0,
   };
+  if (sb == NULL) {
+    logger_log(LOG_FATAL, "sb_new->data mem alloc err");
+  }
   return sb;
 }
 
@@ -215,12 +220,9 @@ StringBuffer *sb_new_from_sv(StringView view) {
 }
 
 void sb_print(StringBuffer *sb) {
-  printf("\"");
   for (size_t i = 0; i < sb->len; ++i) {
     printf("%c", sb->data[i]);
   }
-  printf("\"");
-  printf("\n");
 }
 
 void sb_free(StringBuffer *sb) {

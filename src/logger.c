@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "logger.h"
 
@@ -17,7 +18,12 @@ void logger_log(LogLevel level, const char *fmt, ...) {
     break;
   case LOG_FATAL:
     fprintf(stderr, "[FATAL] ");
-    break;
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+    exit(1);
   default:
     assert(0 && "logger_log unreachable level");
     break;

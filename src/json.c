@@ -153,6 +153,7 @@ bool json_parse_value(Lexer *lexer, Json *dest) {
       /*              "on offset %lu", */
       /*              lexer->ch, lexer->location.line, lexer->location.offset);
        */
+
       /*   return false; */
       /* } */
       size_t start = lexer->idx;
@@ -490,5 +491,8 @@ void json_print(Json *json) {
   case JSON_NULL:
     printf("null");
     break;
+  default:
+    logger_log(LOG_FATAL, "json_print invalid type");
+    exit(1);
   }
 }

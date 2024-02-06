@@ -12,6 +12,8 @@
 #define SB_FMT "%.*s"
 #define SV_PRINT(sv) printf(SV_FMT, (int)(sv.len), sv.data)
 #define SB_PRINT(sb) printf(SB_FMT, (int)(sb->len), sb->data)
+#define SV_NEW_FROM_CSTR(cstr)                                                 \
+  (StringView) { .data = cstr, .len = sizeof(cstr), }
 
 typedef struct {
   const char *data;

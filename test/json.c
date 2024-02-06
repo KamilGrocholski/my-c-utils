@@ -185,7 +185,56 @@ void test_json_parse_object() {
   json_free(json);
 }
 
+void test_json_reading() {
+  typedef struct User {
+    StringView name;
+    int age;
+    bool is_student;
+  } User;
+
+  Json *json = json_new();
+  if (!json_read_file("test.json", json)) {
+    return;
+  }
+  if (json->type != JSON_ARRAY) {
+    return;
+  }
+
+  for (size_t i = 0; i < json->array->len; ++i) {
+    if (json->array->items[i]->type != JSON_OBJECT) {
+      return;
+    }
+    JsonObject *o = json->array->items[i]->object;
+    User user = {0};
+    json_object_get_string(o, sv_new_from_cstr("name"), &user.name);
+    json_object_get_int(o, sv_new_from_cstr("age"), &user.age);
+    json_object_get_bool(o, sv_new_from_cstr("isStudent"), &user.is_student);
+    /* printf("%lu\n", i); */
+    /* sv_print(&user.name); */
+    /* printf("\n%d\n", user.age); */
+    /* printf("%s\n", user.is_student ? "T" : "F"); */
+    /* printf("\n"); */
+  }
+}
+
+void test_json_stringify() {
+  Json *json = json_new();
+  if (!json_read_file("test.json", json)) {
+    return;
+  }
+  printf("raw: \n");
+  json_print(json);
+  StringBuffer *stringified_json = sb_new();
+  printf("\n");
+  json_stringify(json, stringified_json);
+  printf("\n");
+  printf("stringified: \n");
+  SB_PRINT(stringified_json);
+  printf("\n");
+}
+
 void test_json() {
+  test_json_reading();
   test_json_a();
   test_json_free();
   test_json_object();
@@ -193,4 +242,5 @@ void test_json() {
   test_json_parse();
   test_json_parse_array();
   test_json_from_file();
+  test_json_stringify();
 }

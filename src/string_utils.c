@@ -6,7 +6,9 @@
 #include "logger.h"
 #include "string_utils.h"
 
-// TODO better errors
+// TODO
+// better errors
+// failed mem alloc should exit(1)
 
 StringView sv_new(const char *data, size_t len) {
   return (StringView){
@@ -131,6 +133,7 @@ char *sv_dup(StringView sv) {
   return str;
 }
 
+// TODO change to StringBuffer or something - sv_file_free is bad
 bool sv_file_read(const char *filename, StringView *sv) {
   FILE *fh = fopen(filename, "rb");
   if (fh == NULL) {
@@ -171,6 +174,8 @@ bool sv_file_read(const char *filename, StringView *sv) {
 
 void sv_file_free(StringView *file_content) {
   free((char *)file_content->data);
+  file_content->data = NULL;
+  file_content->len = 0;
 }
 
 bool sb_resize(StringBuffer *sb, size_t new_cap) {

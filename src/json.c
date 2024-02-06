@@ -5,10 +5,12 @@
 #include "logger.h"
 
 // TODO
+// change from StringView to StringBuffer
 // https://www.crockford.com/mckeeman.html
 // correct string parsing
 // numbers add: errors, +/-, hex
 // assert last char is valid
+// allocate json in json_parse(), json_free() does not work on json without type
 
 Lexer lexer_new(StringView *input) {
   return (Lexer){
@@ -453,9 +455,9 @@ void json_object_free(JsonObject *o) {
 }
 
 void _json_obj_print_cb(StringView key, Json *value) {
-  printf(", ");
   printf("\"%.*s\": ", (int)key.len, key.data);
   json_print(value);
+  printf(", ");
 }
 
 void json_print(Json *json) {
@@ -495,4 +497,171 @@ void json_print(Json *json) {
   default:
     logger_log(LOG_FATAL, "json_print invalid type");
   }
+}
+
+bool json_object_get_int(JsonObject *o, StringView key, int *dest) {
+  Json *value = json_object_get(o, key);
+  if (value == NULL || value->type != JSON_INT) {
+    return false;
+  }
+  *dest = value->num_integer;
+  return true;
+}
+
+bool json_object_get_double(JsonObject *o, StringView key, double *dest) {
+  Json *value = json_object_get(o, key);
+  if (value == NULL || value->type != JSON_DOUBLE) {
+    return false;
+  }
+  *dest = value->num_double;
+  return true;
+}
+
+bool json_object_get_string(JsonObject *o, StringView key, StringView *dest) {
+  Json *value = json_object_get(o, key);
+  if (value == NULL || value->type != JSON_STRING) {
+    return false;
+  }
+  *dest = value->string;
+  return true;
+}
+
+bool json_object_get_bool(JsonObject *o, StringView key, bool *dest) {
+  Json *value = json_object_get(o, key);
+  if (value == NULL) {
+    return false;
+  }
+  if (value->type == JSON_TRUE) {
+    *dest = true;
+    return true;
+  } else if (value->type == JSON_FALSE) {
+    *dest = false;
+    return true;
+  }
+
+  return false;
+}
+
+bool json_object_get_array(JsonObject *o, StringView key, JsonArray *dest) {
+  Json *value = json_object_get(o, key);
+  if (value == NULL || value->type != JSON_ARRAY) {
+    dest = NULL;
+    return false;
+  }
+  dest = value->array;
+  return true;
+}
+
+bool json_object_get_object(JsonObject *o, StringView key, JsonObject *dest) {
+  Json *value = json_object_get(o, key);
+  if (value == NULL || value->type != JSON_OBJECT) {
+    dest = NULL;
+    return false;
+  }
+  dest = value->object;
+  return true;
+}
+
+bool json_read_file(const char *filename, Json *json) {
+  StringView content = {0};
+  if (!sv_file_read(filename, &content)) {
+    return false;
+  }
+  if (!json_parse(&content, json)) {
+    return false;
+  }
+  // TODO i do not know what to do about this - should use StringBuffer instead
+  // of StringView
+  /* sv_file_free(&content); */
+  return true;
+}
+
+bool json_stringify_value(Json *json, StringBuffer *dest);
+
+bool json_stringify_string(Json *json, StringBuffer *dest) {
+  sb_append_char(dest, '"');
+  sb_append(dest, json->string);
+  sb_append_char(dest, '"');
+  return true;
+}
+
+bool json_stringify_array(Json *json, StringBuffer *dest) {
+  sb_append_char(dest, '[');
+  if (json->array->len == 1) {
+    json_stringify_value(json->array->items[0], dest);
+  } else {
+    json_stringify_value(json->array->items[0], dest);
+    for (size_t i = 1; i < json->array->len; ++i) {
+      sb_append_char(dest, ',');
+      json_stringify_value(json->array->items[i], dest);
+    }
+  }
+  sb_append_char(dest, ']');
+  return true;
+}
+
+bool json_stringify_object(Json *json, StringBuffer *dest) {
+  sb_append_char(dest, '{');
+
+  JsonObject *object = json->object;
+  bool first = true;
+
+  for (size_t i = 0; i < object->size; ++i) {
+    JsonObjectPair *pair = object->buckets[i];
+    while (pair) {
+      if (!first) {
+        sb_append_char(dest, ',');
+      } else {
+        first = false;
+      }
+
+      sb_append_char(dest, '"');
+      sb_append(dest, pair->key);
+      sb_append_char(dest, '"');
+      sb_append_char(dest, ':');
+      json_stringify_value(pair->value, dest);
+
+      pair = pair->next;
+    }
+  }
+
+  sb_append_char(dest, '}');
+  return true;
+}
+
+bool json_stringify_value(Json *json, StringBuffer *dest) {
+  switch (json->type) {
+  case JSON_STRING:
+    json_stringify_string(json, dest);
+    break;
+  case JSON_ARRAY:
+    json_stringify_array(json, dest);
+    break;
+  case JSON_OBJECT:
+    json_stringify_object(json, dest);
+    break;
+  case JSON_INT:
+    sb_append(dest, sv_new_from_cstr("420"));
+    break;
+  case JSON_DOUBLE:
+    sb_append(dest, sv_new_from_cstr("420.222"));
+    break;
+  case JSON_TRUE:
+    sb_append(dest, sv_new_from_cstr("true"));
+    break;
+  case JSON_FALSE:
+    sb_append(dest, sv_new_from_cstr("false"));
+    break;
+  case JSON_NULL:
+    sb_append(dest, sv_new_from_cstr("null"));
+    break;
+  default:
+    logger_log(LOG_FATAL, "json_stringify unreachable type");
+  }
+  return true;
+}
+
+bool json_stringify(Json *json, StringBuffer *dest) {
+  json_stringify_value(json, dest);
+  return true;
 }

@@ -92,6 +92,8 @@ bool sb_append(StringBuffer *sb, StringView sv);
 
 bool sb_append_char(StringBuffer *sb, char ch);
 
+bool sb_append_sb(StringBuffer *sb, StringBuffer *append);
+
 bool sb_insert(StringBuffer *sb, size_t idx, StringView sv);
 
 void sb_remove(StringBuffer *sb, size_t idx, size_t count);

@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -251,6 +252,18 @@ bool sb_compare_sv(StringBuffer *sb, StringView sv) {
 bool sb_is_valid_cstr(StringBuffer *sb) { return sb->data[sb->len] == '\0'; }
 
 bool sb_is_empty(StringBuffer *sb) { return sb->len == 0; }
+
+bool sb_append_sb(StringBuffer *sb, StringBuffer *append) {
+  if (sb->len + append->len >= sb->cap) {
+    if (!sb_resize(sb, sb->cap * 2)) {
+      return false;
+    }
+  }
+  memcpy((char *)sb->data + sb->len, append->data, append->len);
+  sb->len += sb->len;
+  ((char *)sb->data)[sb->len] = '\0';
+  return true;
+}
 
 bool sb_append(StringBuffer *sb, StringView sv) {
   if (sb->len + sv.len >= sb->cap) {

@@ -5,6 +5,7 @@
 - StringBuffer
 - StringView
 - Uri
+- JSON
 
 ## Test
 

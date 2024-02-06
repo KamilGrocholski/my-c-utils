@@ -22,12 +22,12 @@ void lexer_advance(Lexer *lexer) {
   if (lexer->read_idx >= lexer->input->len) {
     lexer->ch = JSON_END_OF_INPUT;
   } else {
-    /* if (lexer->ch == '\n') { */
-    /*   lexer->location.line++; */
-    /*   lexer->location.offset = 0; */
-    /* } else { */
-    /*   lexer->location.offset++; */
-    /* } */
+    if (lexer->ch == '\n') {
+      lexer->location.line++;
+      lexer->location.offset = 0;
+    } else {
+      lexer->location.offset++;
+    }
     lexer->ch = lexer->input->data[lexer->read_idx];
   }
   lexer->idx = lexer->read_idx;
@@ -36,18 +36,20 @@ void lexer_advance(Lexer *lexer) {
 
 void lexer_skip_whitespace(Lexer *lexer) {
   while (lexer->ch == ' ' || lexer->ch == '\r' || lexer->ch == '\t' ||
-         lexer->ch == '\n') {
+         lexer->ch == '\n' || lexer->ch == '\b' || lexer->ch == '\f') {
     lexer_advance(lexer);
   }
 }
 
-void lexer_eat(Lexer *lexer, char ch) {
+bool lexer_eat(Lexer *lexer, char ch) {
   if (lexer->ch != ch) {
-    printf("expected: '%c', got: '%c'\n", ch, lexer->ch);
-    logger_log(LOG_ERROR, "lexer_eat error");
-    exit(1);
+    logger_log(LOG_ERROR,
+               "JSON_PARSE expected '%c' got '%c' at line %lu on offset %lu",
+               ch, lexer->ch, lexer->location.line, lexer->location.offset);
+    return false;
   }
   lexer_advance(lexer);
+  return true;
 }
 
 StringView lexer_read_integer(Lexer *lexer) {
@@ -59,31 +61,37 @@ StringView lexer_read_integer(Lexer *lexer) {
   return sv_sub(*lexer->input, start, end - start);
 }
 
+bool is_alpha_lowercase(char ch) { return ch >= 'a' && ch <= 'z'; }
+
 StringView lexer_read_ident(Lexer *lexer) {
   size_t start = lexer->idx;
-  while (isalpha(lexer->ch)) {
+  while (is_alpha_lowercase(lexer->ch)) {
     lexer_advance(lexer);
   }
   size_t end = lexer->idx;
   return sv_sub(*lexer->input, start, end - start);
 }
 
-StringView lexer_read_string(Lexer *lexer) {
-  lexer_eat(lexer, '"');
+bool lexer_read_string(Lexer *lexer, StringView *dest) {
+  if (!lexer_eat(lexer, '"')) {
+    return false;
+  }
   size_t start = lexer->idx;
   while (lexer->ch != '"' && lexer->ch != JSON_END_OF_INPUT) {
     lexer_advance(lexer);
   }
   size_t end = lexer->idx;
-  lexer_eat(lexer, '"');
-  return sv_sub(*lexer->input, start, end - start);
+  if (!lexer_eat(lexer, '"')) {
+    return false;
+  }
+  *dest = sv_sub(*lexer->input, start, end - start);
+  return true;
 }
 
 Json *json_new() {
   Json *json = malloc(sizeof(Json));
   if (json == NULL) {
-    logger_log(LOG_ERROR, "json_new mem alloc");
-    exit(1);
+    logger_log(LOG_FATAL, "json_new mem alloc");
   }
   return json;
 }
@@ -108,108 +116,155 @@ void json_free(Json *json) {
     free(json);
     break;
   default:
-    logger_log(LOG_ERROR, "json_free invalid json type");
+    logger_log(LOG_FATAL, "json_free invalid json type");
     exit(1);
   }
 }
 
-Json *json_parse(StringView *input) {
+bool json_parse(StringView *input, Json *dest) {
   Lexer lexer = lexer_new(input);
   lexer_advance(&lexer);
 
-  return json_parse_value(&lexer);
+  bool is_success = json_parse_value(&lexer, dest);
+
+  /* if (dest) { */
+  /*   json_free(dest); */
+  /* } */
+
+  return is_success;
 }
 
-Json *json_parse_value(Lexer *lexer) {
+bool json_parse_value(Lexer *lexer, Json *dest) {
   lexer_skip_whitespace(lexer);
   switch (lexer->ch) {
   case '"':
-    return json_parse_string(lexer);
+    return json_parse_string(lexer, dest);
   case '[':
-    return json_parse_array(lexer);
+    return json_parse_array(lexer, dest);
   case '{':
-    return json_parse_object(lexer);
+    return json_parse_object(lexer, dest);
   default: {
     if (isdigit(lexer->ch) || lexer->ch == '-') {
-      Json *value = json_new();
+      /* if (lexer->read_idx >= lexer->input->len || */
+      /*     !isdigit(lexer->input->data[lexer->read_idx])) { */
+      /*   logger_log(LOG_ERROR, */
+      /*              "JSON_PARSE expected digit after '-' got '%c' at line %lu
+       * " */
+      /*              "on offset %lu", */
+      /*              lexer->ch, lexer->location.line, lexer->location.offset);
+       */
+      /*   return false; */
+      /* } */
       size_t start = lexer->idx;
       lexer_advance(lexer);
       while (isdigit(lexer->ch)) {
         lexer_advance(lexer);
       }
       if (lexer->ch == '.') {
-        lexer_eat(lexer, '.');
+        if (!lexer_eat(lexer, '.')) {
+          return false;
+        }
         while (isdigit(lexer->ch)) {
           lexer_advance(lexer);
         }
-        value->type = JSON_DOUBLE;
-        value->num_double =
-            atof(sv_sub(*lexer->input, start, lexer->idx - start).data);
+        dest->type = JSON_DOUBLE;
+        dest->num_double =
+            atof(sv_sub(*lexer->input, start, lexer->idx - start).data); // TODO
       } else {
-        value->type = JSON_INT;
-        value->num_integer =
-            atoi(sv_sub(*lexer->input, start, lexer->idx - start).data);
+        dest->type = JSON_INT;
+        dest->num_integer =
+            atoi(sv_sub(*lexer->input, start, lexer->idx - start).data); // TODO
       }
-      return value;
-    } else if (isalpha(lexer->ch)) {
+      return true;
+    } else if (is_alpha_lowercase(lexer->ch)) {
       StringView ident = lexer_read_ident(lexer);
-      Json *value = json_new();
       if (sv_compare(ident, sv_new("null", 4))) {
-        value->type = JSON_NULL;
+        dest->type = JSON_NULL;
+        return true;
       } else if (sv_compare(ident, sv_new("true", 4))) {
-        value->type = JSON_TRUE;
+        dest->type = JSON_TRUE;
+        return true;
       } else if (sv_compare(ident, sv_new("false", 5))) {
-        value->type = JSON_FALSE;
+        dest->type = JSON_FALSE;
+        return true;
       } else {
-        logger_log(LOG_ERROR, "invalid keyword: '%.*s'", (int)ident.len,
-                   ident.data);
-        exit(1);
+        logger_log(
+            LOG_ERROR,
+            "JSON_PARSE invalid keyword '%.*s' at line %lu on offset %lu",
+            (size_t)ident.len, ident.data, lexer->location.line,
+            lexer->location.offset);
+        return false;
       }
-      return value;
     }
   }
   }
-  return NULL;
+  logger_log(LOG_ERROR,
+             "JSON_PARSE unexpected ch '%c' at line %lu on offset %lu",
+             lexer->ch, lexer->location.line, lexer->location.offset);
+  return false;
 }
 
-Json *json_parse_string(Lexer *lexer) {
-  StringView string = lexer_read_string(lexer);
-  Json *json = json_new();
-  *json = (Json){
+bool json_parse_string(Lexer *lexer, Json *dest) {
+  StringView string;
+  if (!lexer_read_string(lexer, &string)) {
+    return false;
+  }
+  *dest = (Json){
       .type = JSON_STRING,
       .string = string,
   };
-  return json;
+  return true;
 }
 
-Json *json_parse_array(Lexer *lexer) {
-  Json *json = json_new();
+bool json_parse_array(Lexer *lexer, Json *dest) {
   JsonArray *array = json_array_new();
-  *json = (Json){
+  *dest = (Json){
       .type = JSON_ARRAY,
       .array = array,
   };
-  lexer_eat(lexer, '[');
+  if (!lexer_eat(lexer, '[')) {
+    json_array_free(array);
+    return false;
+  }
   lexer_skip_whitespace(lexer);
   if (lexer->ch == ']') {
-    return json;
+    lexer_eat(lexer, ']');
+    return true;
   }
 
   lexer_skip_whitespace(lexer);
 
-  json_array_append(array, json_parse_value(lexer));
+  Json *append = json_new();
+  if (!json_parse_value(lexer, append)) {
+    json_free(append);
+    json_array_free(array);
+    return false;
+  }
+  json_array_append(array, append);
   lexer_skip_whitespace(lexer);
 
   while (lexer->ch == ',') {
-    lexer_eat(lexer, ',');
-    json_array_append(array, json_parse_value(lexer));
+    if (!lexer_eat(lexer, ',')) {
+      json_array_free(array);
+      return false;
+    }
+    Json *append = json_new();
+    if (!json_parse_value(lexer, append)) {
+      json_free(append);
+      json_array_free(array);
+      return false;
+    }
+    json_array_append(array, append);
     lexer_skip_whitespace(lexer);
   }
 
   lexer_skip_whitespace(lexer);
-  lexer_eat(lexer, ']');
+  if (!lexer_eat(lexer, ']')) {
+    json_array_free(array);
+    return false;
+  }
 
-  return json;
+  return true;
 }
 
 void json_array_free(JsonArray *a) {
@@ -220,10 +275,9 @@ void json_array_free(JsonArray *a) {
   free(a);
 }
 
-Json *json_parse_object(Lexer *lexer) {
-  Json *json = json_new();
+bool json_parse_object(Lexer *lexer, Json *dest) {
   JsonObject *object = json_object_new(JSON_OBJECT_SIZE_INIT);
-  *json = (Json){
+  *dest = (Json){
       .type = JSON_OBJECT,
       .object = object,
   };
@@ -231,38 +285,64 @@ Json *json_parse_object(Lexer *lexer) {
   lexer_eat(lexer, '{');
   lexer_skip_whitespace(lexer);
   if (lexer->ch == '}') {
-    return json;
+    lexer_eat(lexer, '}');
+    return true;
   }
 
   lexer_skip_whitespace(lexer);
-  StringView key = lexer_read_string(lexer);
+  StringView key;
+  if (!lexer_read_string(lexer, &key)) {
+    json_object_free(object);
+    return false;
+  }
   lexer_skip_whitespace(lexer);
-  lexer_eat(lexer, ':');
-  Json *value = json_parse_value(lexer);
+  if (!lexer_eat(lexer, ':')) {
+    json_object_free(object);
+    return false;
+  }
+  Json *value = json_new();
+  if (!json_parse_value(lexer, value)) {
+    json_free(value);
+    json_object_free(object);
+    return false;
+  }
   json_object_set(object, key, value);
   lexer_skip_whitespace(lexer);
 
   while (lexer->ch == ',') {
     lexer_eat(lexer, ',');
     lexer_skip_whitespace(lexer);
-    key = lexer_read_string(lexer);
+    if (!lexer_read_string(lexer, &key)) {
+      json_object_free(object);
+      return false;
+    }
     lexer_skip_whitespace(lexer);
-    lexer_eat(lexer, ':');
-    value = json_parse_value(lexer);
+    if (!lexer_eat(lexer, ':')) {
+      json_object_free(object);
+      return false;
+    }
+    Json *value = json_new();
+    if (!json_parse_value(lexer, value)) {
+      json_free(value);
+      json_object_free(object);
+      return false;
+    }
     json_object_set(object, key, value);
   }
 
   lexer_skip_whitespace(lexer);
-  lexer_eat(lexer, '}');
+  if (!lexer_eat(lexer, '}')) {
+    json_object_free(object);
+    return false;
+  }
 
-  return json;
+  return true;
 }
 
 JsonArray *json_array_new() {
   JsonArray *a = malloc(sizeof(JsonArray));
   if (a == NULL) {
-    logger_log(LOG_ERROR, "json_array_new mem alloc err");
-    exit(1);
+    logger_log(LOG_FATAL, "json_array_new mem alloc err");
   }
   *a = (JsonArray){
       .len = 0,
@@ -270,8 +350,7 @@ JsonArray *json_array_new() {
       .items = malloc(sizeof(Json *) * JSON_ARRAY_CAP_INIT),
   };
   if (a->items == NULL) {
-    logger_log(LOG_ERROR, "json_array_new->items mem alloc err");
-    exit(1);
+    logger_log(LOG_FATAL, "json_array_new->items mem alloc err");
   }
   return a;
 }
@@ -287,8 +366,7 @@ void json_array_append(JsonArray *a, Json *item) {
 void json_array_resize(JsonArray *a, size_t new_cap) {
   a->items = realloc(a->items, new_cap * sizeof(Json *));
   if (a->items == NULL) {
-    logger_log(LOG_ERROR, "json_array_resize->items mem realloc err");
-    exit(1);
+    logger_log(LOG_FATAL, "json_array_resize->items mem realloc err");
   }
   a->cap = new_cap;
 }
@@ -296,16 +374,14 @@ void json_array_resize(JsonArray *a, size_t new_cap) {
 JsonObject *json_object_new(size_t size) {
   JsonObject *o = malloc(sizeof(JsonObject));
   if (o == NULL) {
-    logger_log(LOG_ERROR, "json_object_new mem alloc err");
-    exit(1);
+    logger_log(LOG_FATAL, "json_object_new mem alloc err");
   }
   *o = (JsonObject){
       .size = size,
       .buckets = calloc(size, sizeof(JsonObjectPair *)),
   };
   if (o->buckets == NULL) {
-    logger_log(LOG_ERROR, "json_object_new->buckets mem alloc err");
-    exit(1);
+    logger_log(LOG_FATAL, "json_object_new->buckets mem alloc err");
   }
   return o;
 }
@@ -316,8 +392,7 @@ void json_object_set(JsonObject *o, StringView key, Json *value) {
 
   JsonObjectPair *new_pair = malloc(sizeof(JsonObjectPair));
   if (new_pair == NULL) {
-    logger_log(LOG_ERROR, "json_object_set mem alloc err");
-    exit(1);
+    logger_log(LOG_FATAL, "json_object_set mem alloc err");
   }
   *new_pair = (JsonObjectPair){
       .next = o->buckets[idx],

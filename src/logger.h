@@ -5,6 +5,7 @@ typedef enum {
   LOG_INFO,
   LOG_WARNING,
   LOG_ERROR,
+  LOG_FATAL,
 } LogLevel;
 
 void logger_log(LogLevel level, const char *fmt, ...);

@@ -63,17 +63,15 @@ typedef struct JsonObject {
 
 Lexer lexer_new(StringView *input);
 
-Json *json_parse(StringView *input);
+bool json_parse(StringView *input, Json *dest);
 Json *json_new();
-
 void json_free(Json *json);
+void json_print(Json *json);
 
-StringView json_stringify(Json *json);
-
-Json *json_parse_string(Lexer *lexer);
-Json *json_parse_value(Lexer *lexer);
-Json *json_parse_array(Lexer *lexer);
-Json *json_parse_object(Lexer *lexer);
+bool json_parse_string(Lexer *lexer, Json *dest);
+bool json_parse_value(Lexer *lexer, Json *dest);
+bool json_parse_array(Lexer *lexer, Json *dest);
+bool json_parse_object(Lexer *lexer, Json *dest);
 
 JsonArray *json_array_new();
 void json_array_append(JsonArray *a, Json *item);
@@ -87,7 +85,5 @@ size_t json_object_hash(StringView key);
 void json_object_free(JsonObject *o);
 void json_object_foreach(JsonObject *o,
                          void (*callback)(StringView key, Json *value));
-void json_print(Json *json);
-void json_object_free(JsonObject *o);
 
 #endif // _JSON_H

@@ -15,6 +15,9 @@ void logger_log(LogLevel level, const char *fmt, ...) {
   case LOG_ERROR:
     fprintf(stderr, "[ERROR] ");
     break;
+  case LOG_FATAL:
+    fprintf(stderr, "[FATAL] ");
+    break;
   default:
     assert(0 && "logger_log unreachable level");
     break;

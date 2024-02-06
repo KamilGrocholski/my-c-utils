@@ -29,11 +29,12 @@ void test_json_object() {
 }
 
 void test_json_parse() {
-  StringView input = sv_new_from_cstr(
-      "[\"okej\",\"nie\",\"ok\",{\"key\":\"value\"},"
-      "[\"value_in_array\"],123, true, false, null, 234.2, 2, -12.2]");
+  StringView input =
+      sv_new_from_cstr("[\"okej\",\"nie\",\"ok\",{\"key\":\"value\"},"
+                       "[\"value_in_array\"],123, -1, 234.2,-234.234]");
 
-  Json *json = json_parse(&input);
+  Json *json = json_new();
+  json_parse(&input, json);
 
   assert(json->type == JSON_ARRAY && "should be array type");
 
@@ -60,10 +61,27 @@ void test_json_parse() {
   json_free(json);
 }
 
+void test_json_parse_array() {
+  StringView content = sv_new_from_cstr("[[],\"okej\",1,1]");
+  Json *json = json_new();
+
+  assert(json_parse(&content, json) == true &&
+         "should parse array successfully");
+
+  /* json_print(json); */
+  assert(json->array->len == 4 && "should parse array of length 4");
+  assert(json->array->items[2]->type == JSON_INT &&
+         json->array->items[2]->num_integer == 1 &&
+         "should parse integer after array inside array");
+
+  json_free(json);
+}
+
 void test_json_from_file() {
   StringView file_content = {0};
   sv_file_read("test.json", &file_content);
-  Json *json = json_parse(&file_content);
+  Json *json = json_new();
+  json_parse(&file_content, json);
 
   struct User {
     char *name;
@@ -147,9 +165,32 @@ void test_json_from_file() {
   sv_file_free(&file_content);
 }
 
+void test_json_a() {
+  StringView input = sv_new_from_cstr("[\"nie wiem\", -1]");
+  Json *json = json_new();
+  bool is_succes = json_parse(&input, json);
+  assert(is_succes && "should parse a success");
+  /* json_print(json); */
+  json_free(json);
+}
+
+void test_json_parse_object() {
+  StringView input =
+      sv_new_from_cstr("[[]\b\r\t,1,\n\b\t{\"key1\":1, "
+                       "\"key2\":\n\"value2\"\n}\n,[], 1,[], true]");
+  Json *json = json_new();
+  bool is_success = json_parse(&input, json);
+  assert(is_success && "should parse object success");
+  /* json_print(json); */
+  json_free(json);
+}
+
 void test_json() {
+  test_json_a();
   test_json_free();
   test_json_object();
+  test_json_parse_object();
   test_json_parse();
+  test_json_parse_array();
   test_json_from_file();
 }

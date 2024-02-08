@@ -88,4 +88,6 @@ void test_uri() {
           "https://www.example.com/path/to/resource?query=123#fragment"));
 
   test_uri_query_parse();
+
+  printf("All 'uri' tests passed successfully!\n");
 }

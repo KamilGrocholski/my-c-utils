@@ -12,7 +12,7 @@
 // assert last char is valid
 // allocate json in json_parse(), json_free() does not work on json without type
 
-Lexer lexer_new(StringView *input) {
+Lexer lexer_new(StringBuffer *input) {
   return (Lexer){
       .input = input,
       .ch = JSON_END_OF_INPUT,
@@ -44,7 +44,7 @@ void lexer_advance(Lexer *lexer) {
 
 void lexer_skip_whitespace(Lexer *lexer) {
   while (lexer->ch == ' ' || lexer->ch == '\r' || lexer->ch == '\t' ||
-         lexer->ch == '\n' || lexer->ch == '\b' || lexer->ch == '\f') {
+         lexer->ch == '\n') {
     lexer_advance(lexer);
   }
 }
@@ -60,29 +60,29 @@ bool lexer_eat(Lexer *lexer, char ch) {
   return true;
 }
 
-StringView lexer_read_integer(Lexer *lexer) {
+StringBuffer *lexer_read_integer(Lexer *lexer) {
   size_t start = lexer->idx;
   while (isdigit(lexer->ch)) {
     lexer_advance(lexer);
   }
   size_t end = lexer->idx;
-  return sv_sub(*lexer->input, start, end - start);
+  return sb_sub(lexer->input, start, end - 1);
 }
 
 bool is_alpha_lowercase(char ch) { return ch >= 'a' && ch <= 'z'; }
 
-StringView lexer_read_ident(Lexer *lexer) {
+StringBuffer *lexer_read_ident(Lexer *lexer) {
   size_t start = lexer->idx;
   while (is_alpha_lowercase(lexer->ch)) {
     lexer_advance(lexer);
   }
   size_t end = lexer->idx;
-  return sv_sub(*lexer->input, start, end - start);
+  return sb_sub(lexer->input, start, end - 1);
 }
 
-bool lexer_read_string(Lexer *lexer, StringView *dest) {
+StringBuffer *lexer_read_string(Lexer *lexer) {
   if (!lexer_eat(lexer, '"')) {
-    return false;
+    return NULL;
   }
   size_t start = lexer->idx;
   while (lexer->ch != '"' && lexer->ch != JSON_END_OF_INPUT) {
@@ -90,17 +90,17 @@ bool lexer_read_string(Lexer *lexer, StringView *dest) {
   }
   size_t end = lexer->idx;
   if (!lexer_eat(lexer, '"')) {
-    return false;
+    return NULL;
   }
-  *dest = sv_sub(*lexer->input, start, end - start);
-  return true;
+  return sb_sub(lexer->input, start, end - 1);
 }
 
 Json *json_new() {
   Json *json = malloc(sizeof(Json));
   if (json == NULL) {
-    logger_log(LOG_FATAL, "json_new mem alloc");
+    logger_log(LOG_FATAL, "json_new malloc err");
   }
+  json->type = JSON_EMPTY;
   return json;
 }
 
@@ -116,11 +116,14 @@ void json_free(Json *json) {
     json_object_free(json->object);
     break;
   case JSON_STRING:
+    sb_free(json->string);
+    break;
   case JSON_INT:
   case JSON_DOUBLE:
   case JSON_TRUE:
   case JSON_FALSE:
   case JSON_NULL:
+  case JSON_EMPTY:
     free(json);
     break;
   default:
@@ -128,7 +131,7 @@ void json_free(Json *json) {
   }
 }
 
-bool json_parse(StringView *input, Json *dest) {
+bool json_parse(StringBuffer *input, Json *dest) {
   Lexer lexer = lexer_new(input);
   lexer_advance(&lexer);
 
@@ -148,17 +151,6 @@ bool json_parse_value(Lexer *lexer, Json *dest) {
     return json_parse_object(lexer, dest);
   default: {
     if (isdigit(lexer->ch) || lexer->ch == '-') {
-      /* if (lexer->read_idx >= lexer->input->len || */
-      /*     !isdigit(lexer->input->data[lexer->read_idx])) { */
-      /*   logger_log(LOG_ERROR, */
-      /*              "JSON_PARSE expected digit after '-' got '%c' at line %lu
-       * " */
-      /*              "on offset %lu", */
-      /*              lexer->ch, lexer->location.line, lexer->location.offset);
-       */
-
-      /*   return false; */
-      /* } */
       size_t start = lexer->idx;
       lexer_advance(lexer);
       while (isdigit(lexer->ch)) {
@@ -173,44 +165,45 @@ bool json_parse_value(Lexer *lexer, Json *dest) {
         }
         dest->type = JSON_DOUBLE;
         dest->num_double =
-            atof(sv_sub(*lexer->input, start, lexer->idx - start).data); // TODO
+            atof(sb_sub(lexer->input, start, lexer->idx)->data); // TODO
       } else {
         dest->type = JSON_INT;
         dest->num_integer =
-            atoi(sv_sub(*lexer->input, start, lexer->idx - start).data); // TODO
+            atoi(sb_sub(lexer->input, start, lexer->idx)->data); // TODO
       }
       return true;
     } else if (is_alpha_lowercase(lexer->ch)) {
-      StringView ident = lexer_read_ident(lexer);
-      if (sv_compare(ident, sv_new("null", 4))) {
+      StringBuffer *ident = lexer_read_ident(lexer);
+      if (sb_compare_sv(ident, sv_new("null", 4))) {
         dest->type = JSON_NULL;
         return true;
-      } else if (sv_compare(ident, sv_new("true", 4))) {
+      } else if (sb_compare_sv(ident, sv_new("true", 4))) {
         dest->type = JSON_TRUE;
         return true;
-      } else if (sv_compare(ident, sv_new("false", 5))) {
+      } else if (sb_compare_sv(ident, sv_new("false", 5))) {
         dest->type = JSON_FALSE;
         return true;
       } else {
         logger_log(
             LOG_ERROR,
             "JSON_PARSE invalid keyword '%.*s' at line %lu on offset %lu",
-            (size_t)ident.len, ident.data, lexer->location.line,
+            ident->len, ident->data, lexer->location.line,
             lexer->location.offset);
+        sb_free(ident);
         return false;
       }
     }
+    logger_log(LOG_ERROR,
+               "JSON_PARSE unexpected ch '%c' at line %lu on offset %lu",
+               lexer->ch, lexer->location.line, lexer->location.offset);
+    return false;
   }
   }
-  logger_log(LOG_ERROR,
-             "JSON_PARSE unexpected ch '%c' at line %lu on offset %lu",
-             lexer->ch, lexer->location.line, lexer->location.offset);
-  return false;
 }
 
 bool json_parse_string(Lexer *lexer, Json *dest) {
-  StringView string;
-  if (!lexer_read_string(lexer, &string)) {
+  StringBuffer *string = lexer_read_string(lexer);
+  if (string == NULL) {
     return false;
   }
   *dest = (Json){
@@ -280,63 +273,64 @@ void json_array_free(JsonArray *a) {
 }
 
 bool json_parse_object(Lexer *lexer, Json *dest) {
+  if (!lexer_eat(lexer, '{')) {
+    return false;
+  }
+
   JsonObject *object = json_object_new(JSON_OBJECT_SIZE_INIT);
   *dest = (Json){
       .type = JSON_OBJECT,
       .object = object,
   };
 
-  lexer_eat(lexer, '{');
   lexer_skip_whitespace(lexer);
   if (lexer->ch == '}') {
-    lexer_eat(lexer, '}');
+    lexer_advance(lexer);
     return true;
   }
 
-  lexer_skip_whitespace(lexer);
-  StringView key;
-  if (!lexer_read_string(lexer, &key)) {
-    json_object_free(object);
+  StringBuffer *key = lexer_read_string(lexer);
+  if (!key) {
     return false;
   }
   lexer_skip_whitespace(lexer);
   if (!lexer_eat(lexer, ':')) {
-    json_object_free(object);
+    sb_free(key);
     return false;
   }
   Json *value = json_new();
   if (!json_parse_value(lexer, value)) {
     json_free(value);
-    json_object_free(object);
     return false;
   }
+
   json_object_set(object, key, value);
+
   lexer_skip_whitespace(lexer);
 
   while (lexer->ch == ',') {
-    lexer_eat(lexer, ',');
+    lexer_advance(lexer);
     lexer_skip_whitespace(lexer);
-    if (!lexer_read_string(lexer, &key)) {
-      json_object_free(object);
+    key = lexer_read_string(lexer);
+    if (!key) {
       return false;
     }
     lexer_skip_whitespace(lexer);
     if (!lexer_eat(lexer, ':')) {
-      json_object_free(object);
+      sb_free(key);
       return false;
     }
     Json *value = json_new();
     if (!json_parse_value(lexer, value)) {
       json_free(value);
-      json_object_free(object);
       return false;
     }
     json_object_set(object, key, value);
+    lexer_skip_whitespace(lexer);
   }
 
   lexer_skip_whitespace(lexer);
   if (!lexer_eat(lexer, '}')) {
-    json_object_free(object);
     return false;
   }
 
@@ -390,8 +384,8 @@ JsonObject *json_object_new(size_t size) {
   return o;
 }
 
-void json_object_set(JsonObject *o, StringView key, Json *value) {
-  size_t hash = json_object_hash(key);
+void json_object_set(JsonObject *o, StringBuffer *key, Json *value) {
+  size_t hash = json_object_hash(sv_new(key->data, key->len));
   size_t idx = hash % o->size;
 
   JsonObjectPair *new_pair = malloc(sizeof(JsonObjectPair));
@@ -412,7 +406,7 @@ Json *json_object_get(JsonObject *o, StringView key) {
 
   JsonObjectPair *curr = o->buckets[idx];
   while (curr) {
-    if (sv_compare(curr->key, key)) {
+    if (sb_compare_sv(curr->key, key)) {
       return curr->value;
     }
     curr = curr->next;
@@ -422,15 +416,14 @@ Json *json_object_get(JsonObject *o, StringView key) {
 
 size_t json_object_hash(StringView key) {
   size_t h = 0;
-  while (key.len) {
-    h = 31 * h + *(key.data)++;
-    --key.len;
+  for (size_t i = 0; i < key.len; ++i) {
+    h = 31 * h + key.data[i];
   }
   return h;
 }
 
 void json_object_foreach(JsonObject *o,
-                         void (*callback)(StringView key, Json *value)) {
+                         void (*callback)(StringBuffer *key, Json *value)) {
   for (size_t i = 0; i < o->size; ++i) {
     JsonObjectPair *pair = o->buckets[i];
     while (pair) {
@@ -454,22 +447,22 @@ void json_object_free(JsonObject *o) {
   free(o);
 }
 
-void _json_obj_print_cb(StringView key, Json *value) {
-  printf("\"%.*s\": ", (int)key.len, key.data);
+void _json_obj_print_cb(StringBuffer *key, Json *value) {
+  printf("\"%s\":", key->data);
   json_print(value);
-  printf(", ");
+  printf(",");
 }
 
 void json_print(Json *json) {
   switch (json->type) {
   case JSON_STRING:
-    printf("\'%.*s\'", (int)json->string.len, json->string.data);
+    printf("\"%s\"", json->string->data);
     break;
   case JSON_ARRAY:
     printf("[");
     for (size_t i = 0; i < json->array->len; ++i) {
       if (i > 0)
-        printf(", ");
+        printf(",");
       json_print(json->array->items[i]);
     }
     printf("]");
@@ -499,80 +492,82 @@ void json_print(Json *json) {
   }
 }
 
-bool json_object_get_int(JsonObject *o, StringView key, int *dest) {
+bool json_object_get_int(JsonObject *o, StringView key, int **dest) {
   Json *value = json_object_get(o, key);
   if (value == NULL || value->type != JSON_INT) {
     return false;
   }
-  *dest = value->num_integer;
+  **dest = value->num_integer;
   return true;
 }
 
-bool json_object_get_double(JsonObject *o, StringView key, double *dest) {
+bool json_object_get_double(JsonObject *o, StringView key, double **dest) {
   Json *value = json_object_get(o, key);
   if (value == NULL || value->type != JSON_DOUBLE) {
     return false;
   }
-  *dest = value->num_double;
+  **dest = value->num_double;
   return true;
 }
 
-bool json_object_get_string(JsonObject *o, StringView key, StringView *dest) {
+bool json_object_get_string(JsonObject *o, StringView key,
+                            StringBuffer **dest) {
   Json *value = json_object_get(o, key);
   if (value == NULL || value->type != JSON_STRING) {
+    *dest = NULL;
     return false;
   }
   *dest = value->string;
   return true;
 }
 
-bool json_object_get_bool(JsonObject *o, StringView key, bool *dest) {
+bool json_object_get_bool(JsonObject *o, StringView key, bool **dest) {
   Json *value = json_object_get(o, key);
   if (value == NULL) {
     return false;
   }
   if (value->type == JSON_TRUE) {
-    *dest = true;
+    **dest = true;
     return true;
   } else if (value->type == JSON_FALSE) {
-    *dest = false;
+    **dest = false;
     return true;
   }
 
   return false;
 }
 
-bool json_object_get_array(JsonObject *o, StringView key, JsonArray *dest) {
+bool json_object_get_array(JsonObject *o, StringView key, JsonArray **dest) {
   Json *value = json_object_get(o, key);
   if (value == NULL || value->type != JSON_ARRAY) {
-    dest = NULL;
+    *dest = NULL;
     return false;
   }
-  dest = value->array;
+  *dest = value->array;
   return true;
 }
 
-bool json_object_get_object(JsonObject *o, StringView key, JsonObject *dest) {
+bool json_object_get_object(JsonObject *o, StringView key, JsonObject **dest) {
   Json *value = json_object_get(o, key);
   if (value == NULL || value->type != JSON_OBJECT) {
-    dest = NULL;
+    *dest = NULL;
     return false;
   }
-  dest = value->object;
+  *dest = value->object;
   return true;
 }
 
-bool json_read_file(const char *filename, Json *json) {
-  StringView content = {0};
-  if (!sv_file_read(filename, &content)) {
+bool json_parse_file(const char *filename, Json *json) {
+  StringBuffer *content = sb_new();
+  if (!sb_file_read(filename, content)) {
+    sb_free(content);
     return false;
   }
-  if (!json_parse(&content, json)) {
+  if (!json_parse(content, json)) {
+    sb_free(content);
     return false;
   }
-  // TODO i do not know what to do about this - should use StringBuffer instead
-  // of StringView
-  /* sv_file_free(&content); */
+  sb_free(content);
   return true;
 }
 
@@ -580,14 +575,17 @@ bool json_stringify_value(Json *json, StringBuffer *dest);
 
 bool json_stringify_string(Json *json, StringBuffer *dest) {
   sb_append_char(dest, '"');
-  sb_append(dest, json->string);
+  sb_append_sb(dest, json->string);
   sb_append_char(dest, '"');
   return true;
 }
 
 bool json_stringify_array(Json *json, StringBuffer *dest) {
   sb_append_char(dest, '[');
-  if (json->array->len == 1) {
+  if (json->array->len == 0) {
+    sb_append_char(dest, ']');
+    return true;
+  } else if (json->array->len == 1) {
     json_stringify_value(json->array->items[0], dest);
   } else {
     json_stringify_value(json->array->items[0], dest);
@@ -616,7 +614,7 @@ bool json_stringify_object(Json *json, StringBuffer *dest) {
       }
 
       sb_append_char(dest, '"');
-      sb_append(dest, pair->key);
+      sb_append_sb(dest, pair->key);
       sb_append_char(dest, '"');
       sb_append_char(dest, ':');
       json_stringify_value(pair->value, dest);
@@ -640,12 +638,16 @@ bool json_stringify_value(Json *json, StringBuffer *dest) {
   case JSON_OBJECT:
     json_stringify_object(json, dest);
     break;
-  case JSON_INT:
-    sb_append(dest, sv_new_from_cstr("420"));
-    break;
-  case JSON_DOUBLE:
-    sb_append(dest, sv_new_from_cstr("420.222"));
-    break;
+  case JSON_INT: {
+    char int_str[JSON_INT_STR_CAP];
+    snprintf(int_str, sizeof(int_str), "%d", json->num_integer);
+    sb_append(dest, sv_new_from_cstr(int_str));
+  } break;
+  case JSON_DOUBLE: {
+    char double_str[JSON_DOUBLE_STR_CAP];
+    snprintf(double_str, sizeof(double_str), "%.17g", json->num_double);
+    sb_append(dest, sv_new_from_cstr(double_str));
+  } break;
   case JSON_TRUE:
     sb_append(dest, sv_new_from_cstr("true"));
     break;
@@ -664,4 +666,51 @@ bool json_stringify_value(Json *json, StringBuffer *dest) {
 bool json_stringify(Json *json, StringBuffer *dest) {
   json_stringify_value(json, dest);
   return true;
+}
+
+Json *json_new_string(const char *value) {
+  Json *j = json_new();
+  j->type = JSON_STRING;
+  j->string = sb_new_from_cstr(value);
+  return j;
+}
+
+Json *json_new_int(int value) {
+  Json *j = json_new();
+  j->type = JSON_INT;
+  j->num_integer = value;
+  return j;
+}
+
+Json *json_new_double(double value) {
+  Json *j = json_new();
+  j->type = JSON_DOUBLE;
+  j->num_double = value;
+  return j;
+}
+
+Json *json_new_bool(bool value) {
+  Json *j = json_new();
+  j->type = value ? JSON_TRUE : JSON_FALSE;
+  return j;
+}
+
+Json *json_new_null() {
+  Json *j = json_new();
+  j->type = JSON_NULL;
+  return j;
+}
+
+Json *json_new_object() {
+  Json *j = json_new();
+  j->object = json_object_new(JSON_OBJECT_SIZE_INIT);
+  j->type = JSON_OBJECT;
+  return j;
+}
+
+Json *json_new_array() {
+  Json *j = json_new();
+  j->array = json_array_new();
+  j->type = JSON_ARRAY;
+  return j;
 }

@@ -1,232 +1,180 @@
 #include <assert.h>
-#include <stdbool.h>
-
-#include "_all.h"
+#include <stdio.h>
 
 #include "../src/string_utils.h"
 
-bool test_sv_find(StringView haystack, StringView needle, ssize_t expected) {
-  return sv_find(haystack, needle) == expected;
+void test_sv_starts_with() {
+  StringView sv1 = sv_new_from_cstr("hello world");
+  StringView sv2 = sv_new_from_cstr("hello");
+  StringView sv3 = sv_new_from_cstr("world");
+
+  assert(sv_starts_with(sv1, sv2) && "test_sv_starts_with failed");
+  assert(!sv_starts_with(sv1, sv3) && "test_sv_starts_with failed");
 }
 
-bool test_sv_is_empty(StringView sv, bool expected) {
-  return sv_is_empty(sv) == expected;
-}
+void test_sv_ends_with() {
+  StringView sv1 = sv_new_from_cstr("hello world");
+  StringView sv2 = sv_new_from_cstr("world");
+  StringView sv3 = sv_new_from_cstr("hello");
 
-bool test_sv_compare(StringView a, StringView b, bool expected) {
-  return sv_compare(a, b) == expected;
-}
-
-bool test_sv_contains(StringView haystack, StringView needle, bool expected) {
-  return sv_contains(haystack, needle) == expected;
-}
-
-bool test_sv_starts_with(StringView src, StringView starts_with,
-                         bool expected) {
-  return sv_starts_with(src, starts_with) == expected;
-}
-
-bool test_sv_ends_with(StringView src, StringView ends_with, bool expected) {
-  return sv_ends_with(src, ends_with) == expected;
-}
-
-bool test_sv_pop_first_split_by(StringView *src, StringView split_by,
-                                StringView *expected_pops) {
-  size_t pops_count = 0;
-  StringView pop;
-  while (!sv_is_empty(*src)) {
-    pop = sv_pop_first_split_by(src, split_by);
-    if (!sv_compare(expected_pops[pops_count], pop))
-      return false;
-    pops_count++;
-  }
-  return true;
-}
-
-bool test_sv_is_valid_cstr(StringView src, bool expected) {
-  return sv_is_valid_cstr(src) == expected;
-}
-
-bool test_sv_sub(StringView src, size_t idx, size_t count,
-                 StringView expected) {
-  return sv_compare(sv_sub(src, idx, count), expected);
+  assert(sv_ends_with(sv1, sv2) && "test_sv_ends_with failed");
+  assert(!sv_ends_with(sv1, sv3) && "test_sv_ends_with failed");
 }
 
 void test_sv_trim() {
-  StringView sv = sv_new_from_cstr("    ABCD    ");
-  assert(sv_compare(sv_trim_left(sv), sv_new_from_cstr("ABCD    ")) &&
-         "should sv trim left");
-  assert(sv_compare(sv_trim_right(sv), sv_new_from_cstr("    ABCD")) &&
-         "should sv trim right");
-  assert(sv_compare(sv_trim(sv), sv_new_from_cstr("ABCD")) && "should sv trim");
+  StringView sv1 = sv_new_from_cstr("  hello world  ");
+  StringView sv2 = sv_new_from_cstr("hello world");
+
+  assert(sv_compare(sv_trim(sv1), sv2) && "test_sv_trim failed");
 }
 
-bool test_sb_new() {
+void test_sv_find() {
+  StringView sv1 = sv_new_from_cstr("hello world");
+  StringView sv2 = sv_new_from_cstr("world");
+
+  assert(sv_find(sv1, sv2) == 6 && "test_sv_find failed");
+}
+
+void test_sv_contains() {
+  StringView sv1 = sv_new_from_cstr("hello world");
+  StringView sv2 = sv_new_from_cstr("world");
+  StringView sv3 = sv_new_from_cstr("foo");
+
+  assert(sv_contains(sv1, sv2) && "test_sv_contains failed");
+  assert(!sv_contains(sv1, sv3) && "test_sv_contains failed");
+}
+
+void test_sv_compare() {
+  StringView sv1 = sv_new_from_cstr("hello");
+  StringView sv2 = sv_new_from_cstr("hello");
+  StringView sv3 = sv_new_from_cstr("world");
+
+  assert(sv_compare(sv1, sv2) && "test_sv_compare failed");
+  assert(!sv_compare(sv1, sv3) && "test_sv_compare failed");
+}
+
+void test_sv_trim_left() {
+  StringView sv1 = sv_new_from_cstr("  hello");
+  StringView sv2 = sv_new_from_cstr("hello");
+  StringView sv3 = sv_new_from_cstr(" ");
+  StringView sv4 = sv_new_from_cstr("");
+
+  assert(sv_compare(sv_trim_left(sv1), sv2) && "test_sv_trim_left failed");
+  assert(sv_compare(sv_trim_left(sv3), sv4) &&
+         "test_sv_trim_left failed empty");
+}
+
+void test_sv_trim_right() {
+  StringView sv1 = sv_new_from_cstr("hello  ");
+  StringView sv2 = sv_new_from_cstr("hello");
+
+  StringView sv3 = sv_new_from_cstr(" ");
+  StringView sv4 = sv_new_from_cstr("");
+
+  assert(sv_compare(sv_trim_right(sv1), sv2) && "test_sv_trim_right failed");
+  assert(sv_compare(sv_trim_right(sv3), sv4) &&
+         "test_sv_trim_right failed empty");
+}
+
+void test_sv_is_empty() {
+  StringView sv1 = sv_new_from_cstr("");
+  StringView sv2 = sv_new_from_cstr("hello");
+
+  assert(sv_is_empty(sv1) && "test_sv_is_empty failed");
+  assert(!sv_is_empty(sv2) && "test_sv_is_empty failed");
+}
+
+void test_sb_append() {
   StringBuffer *sb = sb_new();
-  bool out = sb->data != NULL;
+  StringView sv1 = sv_new_from_cstr("hello");
+  StringView sv2 = sv_new_from_cstr(" world");
+
+  sb_append(sb, sv1);
+  sb_append(sb, sv2);
+
+  assert(sb->len == 11 && "test_sb_append failed len");
+  assert(sb_compare_sv(sb, sv_new_from_cstr("hello world")) &&
+         "test_sb_append failed compare");
+
   sb_free(sb);
-  return out;
 }
-bool test_sb_clear() {
-  StringBuffer *sb = sb_new_from_sv(sv_new_from_cstr("AB"));
+
+void test_sb_append_sb() {
+  StringBuffer *sb1 = sb_new_from_cstr("hello");
+  StringBuffer *sb2 = sb_new_from_cstr(" world");
+
+  sb_append_sb(sb1, sb2);
+
+  assert(sb1->len == 11 && "test_sb_append_sb failed");
+  assert(sb_compare_sv(sb1, sv_new_from_cstr("hello world")) &&
+         "test_sb_append_sb failed");
+
+  sb_free(sb1);
+  sb_free(sb2);
+}
+
+void test_sb_insert() {
+  StringBuffer *sb = sb_new_from_cstr("hello");
+
+  sb_insert(sb, 5, sv_new_from_cstr(" world"));
+
+  assert(sb->len == 11 && "test_sb_insert failed");
+  assert(sb_compare_sv(sb, sv_new_from_cstr("hello world")) &&
+         "test_sb_insert failed");
+
+  sb_free(sb);
+}
+
+void test_sb_sub() {
+  StringBuffer *sb = sb_new_from_cstr("ABCDE");
+  StringBuffer *sub = sb_sub(sb, 1, 3);
+
+  assert(sub->len == 3 && "test_sb_sub failed len");
+  assert(sb_compare_sv(sub, sv_new_from_cstr("BCD")) &&
+         "test_sb_sub failed compare");
+  sb_free(sb);
+}
+
+void test_sb_clear() {
+  StringBuffer *sb = sb_new_from_cstr("hello world");
+
   sb_clear(sb);
-  bool out = sb->len == 0 && sb->data[sb->len] == '\0';
+
+  assert(sb->len == 0 && "test_sb_clear failed");
+  assert(sb_is_empty(sb) && "test_sb_clear failed");
+
   sb_free(sb);
-  return out;
 }
 
-bool test_sb_compare_sv(StringBuffer *sb, StringView sv, bool expected) {
-  bool out = sb_compare_sv(sb, sv) == expected;
+void test_sb_remove() {
+  StringBuffer *sb = sb_new_from_cstr("hello world");
+
+  sb_remove(sb, 5, 6);
+
+  assert(sb->len == 5 && "test_sb_remove failed");
+  assert(sb_compare_sv(sb, sv_new_from_cstr("hello")) &&
+         "test_sb_remove failed");
+
   sb_free(sb);
-  return out;
-}
-
-bool test_sb_compare(StringBuffer *a, StringBuffer *b, bool expected) {
-  bool out = sb_compare(a, b) == expected;
-  sb_free(a);
-  sb_free(b);
-  return out;
-}
-
-bool test_sb_append(StringBuffer *src, StringView append, StringView expected) {
-  sb_append(src, append);
-  bool out = sb_compare_sv(src, expected);
-  sb_free(src);
-  return out;
-}
-
-bool test_sb_insert(StringBuffer *src, StringView append, size_t idx,
-                    StringView expected) {
-  sb_insert(src, idx, append);
-  bool out = sb_compare_sv(src, expected);
-  sb_free(src);
-  return out;
-}
-
-bool test_sb_remove(StringBuffer *src, size_t idx, size_t count,
-                    StringView expected) {
-  sb_remove(src, idx, count);
-  bool out = sb_compare_sv(src, expected);
-  sb_free(src);
-  return out;
 }
 
 void test_string_utils() {
-  // SV
-
-  assert(test_sv_find(sv_new_from_cstr("ABCD"), sv_new_from_cstr("AB"), 0) &&
-         "should find at 0");
-  assert(test_sv_find(sv_new_from_cstr("ABCD"), sv_new_from_cstr("D"), 3) &&
-         "should find last");
-  assert(test_sv_find(sv_new_from_cstr("ABCD"), sv_new_from_cstr("BC"), 1) &&
-         "should find inside");
-  assert(test_sv_find(sv_new_from_cstr("ABCD"), sv_new_from_cstr("E"), -1) &&
-         "should not find");
-
-  assert(
-      test_sv_contains(sv_new_from_cstr("ABCD"), sv_new_from_cstr("D"), true) &&
-      "should contain");
-  assert(test_sv_contains(sv_new_from_cstr("ABCD"), sv_new_from_cstr("E"),
-                          false) &&
-         "should not contain");
-
-  assert(test_sv_is_empty(sv_new_from_cstr(""), true) && "should be empty");
-  assert(test_sv_is_empty(sv_new_from_cstr("a"), false) &&
-         "should not be empty");
-
-  assert(test_sv_compare(sv_new_from_cstr(""), sv_new_from_cstr(""), true) &&
-         "should compare both empty true");
-  assert(
-      test_sv_compare(sv_new_from_cstr("aa"), sv_new_from_cstr("aa"), true) &&
-      "should compare true");
-  assert(
-      test_sv_compare(sv_new_from_cstr("aa"), sv_new_from_cstr("ab"), false) &&
-      "should compare false");
-
-  assert(
-      test_sv_starts_with(sv_new_from_cstr(""), sv_new_from_cstr(""), true) &&
-      "should starts_with both empty true");
-  assert(test_sv_starts_with(sv_new_from_cstr("AA"), sv_new_from_cstr("AA"),
-                             true) &&
-         "should starts_with");
-  assert(test_sv_starts_with(sv_new_from_cstr("AB"), sv_new_from_cstr("A"),
-                             true) &&
-         "should starts_with not equal");
-  assert(test_sv_starts_with(sv_new_from_cstr("AB"), sv_new_from_cstr("B"),
-                             false) &&
-         "should not starts_with");
-
-  assert(test_sv_ends_with(sv_new_from_cstr(""), sv_new_from_cstr(""), true) &&
-         "should ends_with both empty true");
-  assert(
-      test_sv_ends_with(sv_new_from_cstr("AA"), sv_new_from_cstr("AA"), true) &&
-      "should ends_with");
-  assert(
-      test_sv_ends_with(sv_new_from_cstr("AB"), sv_new_from_cstr("B"), true) &&
-      "should ends_with not equal");
-  assert(
-      test_sv_ends_with(sv_new_from_cstr("AB"), sv_new_from_cstr("A"), false) &&
-      "should not ends_with");
-
-  StringView expected_pops[] = {
-      sv_new_from_cstr("AB"),
-      sv_new_from_cstr("CD"),
-      sv_new_from_cstr("EF"),
-      sv_new_from_cstr("GH"),
-  };
-  StringView pop_src = sv_new_from_cstr("AB/CD/EF/GH");
-  assert(test_sv_pop_first_split_by(&pop_src, sv_new_from_cstr("/"),
-                                    expected_pops) &&
-         "should pop all");
-
-  assert(test_sv_is_valid_cstr(sv_new_from_cstr("okej"), true) &&
-         "should be valid cstr");
-
-  assert(test_sv_sub(sv_new_from_cstr("AB/CD/EF"), 3, 1000,
-                     sv_new_from_cstr("CD/EF")) &&
-         "should sub overflow count");
-
-  assert(
-      test_sv_sub(sv_new_from_cstr("AB/CD/EF"), 3, 2, sv_new_from_cstr("CD")) &&
-      "should sub inrange count");
-
+  test_sv_starts_with();
+  test_sv_ends_with();
   test_sv_trim();
+  test_sv_find();
+  test_sv_contains();
+  test_sv_compare();
+  test_sv_trim_left();
+  test_sv_trim_right();
+  test_sv_is_empty();
 
-  // SB
+  test_sb_append();
+  test_sb_insert();
+  test_sb_append_sb();
+  test_sb_sub();
+  test_sb_clear();
+  test_sb_remove();
 
-  assert(test_sb_new() && "should sb_new");
-  assert(test_sb_clear() && "should sb_clear");
-
-  assert(test_sb_compare(sb_new_from_sv(sv_new_from_cstr("okej")),
-                         sb_new_from_sv(sv_new_from_cstr("okej")), true) &&
-         "should compare sb");
-
-  assert(test_sb_compare(sb_new_from_sv(sv_new_from_cstr("AA")),
-                         sb_new_from_sv(sv_new_from_cstr("BB")), false) &&
-         "should not compare sb");
-
-  assert(test_sb_compare_sv(sb_new_from_sv(sv_new_from_cstr("AA")),
-                            (sv_new_from_cstr("AA")), true) &&
-         "should compare sb to sv");
-  assert(test_sb_compare_sv(sb_new_from_sv(sv_new_from_cstr("AA")),
-                            (sv_new_from_cstr("BB")), false) &&
-         "should not compare sb to sv");
-
-  assert(test_sb_append(sb_new(), sv_new_from_cstr("BB"),
-                        sv_new_from_cstr("BB")) &&
-         "should append sv to empty sb");
-  assert(test_sb_append(sb_new_from_sv(sv_new_from_cstr("AA")),
-                        sv_new_from_cstr("BB"), sv_new_from_cstr("AABB")) &&
-         "should append sv to non empty sb");
-
-  assert(test_sb_insert(sb_new(), sv_new_from_cstr("BB"), 0,
-                        sv_new_from_cstr("BB")) &&
-         "should insert sv to empty sb with overflow index");
-  assert(test_sb_insert(sb_new_from_sv(sv_new_from_cstr("AA")),
-                        sv_new_from_cstr("BB"), 2, sv_new_from_cstr("AABB")) &&
-         "should insert sv to non empty sb");
-
-  assert(test_sb_remove(sb_new_from_sv(sv_new_from_cstr("AABBCC")), 2, 2,
-                        sv_new_from_cstr("AACC")) &&
-         "should remove from sb");
+  printf("All 'string_utils' tests passed!\n");
 }

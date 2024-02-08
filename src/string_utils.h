@@ -7,6 +7,8 @@
 #define _STRING_UTILS_H
 
 #define SB_INITIAL_CAP 64
+#define SB_INT_CAP 20
+#define SB_DOUBLE_CAP 40
 
 #define SV_FMT "%.*s"
 #define SB_FMT "%.*s"
@@ -28,6 +30,8 @@ typedef struct {
 
 // SV
 
+const char *cstr(const char *literal);
+
 StringView sv_new(const char *data, size_t len);
 
 StringView sv_new_from_cstr(const char *data);
@@ -39,8 +43,6 @@ void sv_print(StringView *sv);
 ssize_t sv_find(StringView haystack, StringView needle);
 
 bool sv_is_empty(StringView sv);
-
-bool sv_is_valid_cstr(StringView sv);
 
 bool sv_starts_with(StringView sv, StringView starts_with);
 
@@ -62,19 +64,19 @@ StringView sv_trim(StringView sv);
 
 char *sv_dup(StringView sv);
 
-bool sv_file_read(const char *filename, StringView *sv);
-
-void sv_file_free(StringView *file_content);
-
 // SB
 
-bool sb_resize(StringBuffer *sb, size_t new_cap);
+void sb_resize(StringBuffer *sb, size_t new_cap);
 
 StringBuffer *sb_new();
 
 StringBuffer *sb_new_with_custom_cap(size_t cap);
 
 StringBuffer *sb_new_from_sv(StringView view);
+
+StringBuffer *sb_new_from_cstr(const char *data);
+
+StringBuffer *sb_sub(StringBuffer *sb, size_t start, size_t end);
 
 void sb_print(StringBuffer *sb);
 
@@ -90,14 +92,16 @@ bool sb_is_valid_cstr(StringBuffer *sb);
 
 bool sb_is_empty(StringBuffer *sb);
 
-bool sb_append(StringBuffer *sb, StringView sv);
+void sb_append(StringBuffer *sb, StringView sv);
 
-bool sb_append_char(StringBuffer *sb, char ch);
+void sb_append_char(StringBuffer *sb, char ch);
 
-bool sb_append_sb(StringBuffer *sb, StringBuffer *append);
+void sb_append_sb(StringBuffer *sb, StringBuffer *append);
 
-bool sb_insert(StringBuffer *sb, size_t idx, StringView sv);
+void sb_insert(StringBuffer *sb, size_t idx, StringView sv);
 
 void sb_remove(StringBuffer *sb, size_t idx, size_t count);
+
+bool sb_file_read(const char *filename, StringBuffer *dest);
 
 #endif // _STRING_BUFFER_H

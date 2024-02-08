@@ -5,6 +5,6 @@ void test_string_utils();
 void test_uri();
 void test_dynamic_array();
 void test_json();
-void test_fake_server();
+void test_lexer();
 
 #endif // _ALL_H

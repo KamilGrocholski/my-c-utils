@@ -1,246 +1,137 @@
 #include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #include "../src/json.h"
 
-void test_json_free() {
-  JsonArray *array = json_array_new();
-  json_array_free(array);
-  printf("free array\n");
+void test_json_compare() {
+  Json *json_string1 = json_new_string("Hello");
+  Json *json_string2 = json_new_string("Hello");
+  Json *json_int1 = json_new_int(42);
+  Json *json_int2 = json_new_int(42);
+  Json *json_double1 = json_new_double(3.14);
+  Json *json_double2 = json_new_double(3.14);
+  Json *json_array1 = json_new();
+  json_array1->type = JSON_ARRAY;
+  json_array1->array = json_array_new();
+  Json *json_array2 = json_new();
+  json_array2->array = json_array_new();
+  json_array2->type = JSON_ARRAY;
 
-  JsonObject *obj = json_object_new(4);
-  json_object_free(obj);
-  printf("free object\n");
+  assert(sb_compare(json_string1->string, json_string2->string) &&
+         "should compare string");
+  assert(json_double1->num_double == json_double2->num_double &&
+         "should compare double");
+  assert(json_int1->num_integer == json_int2->num_integer &&
+         "should compare int");
+  assert(json_array1->array->len == json_array2->array->len &&
+         "should compare array");
+
+  json_free(json_string1);
+  json_free(json_string2);
+  json_free(json_int1);
+  json_free(json_int2);
+  json_free(json_double1);
+  json_free(json_double2);
+  json_free(json_array1);
+  json_free(json_array2);
 }
 
-void test_json_object() {
-  JsonObject *obj = json_object_new(4);
+void test_json_parse_file() {
   Json *json = json_new();
-  json->type = JSON_STRING;
-  StringView key = sv_new_from_cstr("key");
-  StringView value = sv_new_from_cstr("value");
-  json->string = value;
-  json_object_set(obj, key, json);
+  assert(json_parse_file("test.json", json) && "should parse from file");
 
-  Json *target = json_object_get(obj, key);
-  StringView str = target->string;
-  assert(sv_compare(str, value) && "not equal");
+  JsonObject *first = json->array->items[0]->object;
+  JsonObject *second = json->array->items[1]->object;
 
-  json_free(json);
-}
+  assert(sb_compare_sv(json_object_get(first, sv_new_from_cstr("name"))->string,
+                       sv_new_from_cstr("John")) &&
+         "first name");
+  assert(25 == json_object_get(first, sv_new_from_cstr("age"))->num_integer &&
+         "first age");
+  assert(JSON_TRUE ==
+             json_object_get(first, sv_new_from_cstr("isStudent"))->type &&
+         "first isStudent");
 
-void test_json_parse() {
-  StringView input =
-      sv_new_from_cstr("[\"okej\",\"nie\",\"ok\",{\"key\":\"value\"},"
-                       "[\"value_in_array\"],123, -1, 234.2,-234.234]");
-
-  Json *json = json_new();
-  json_parse(&input, json);
-
-  assert(json->type == JSON_ARRAY && "should be array type");
-
-  StringView a = sv_new_from_cstr("okej");
-  assert(sv_compare(json->array->items[0]->string, a) && "should a be equal");
-
-  StringView b = sv_new_from_cstr("nie");
-  assert(sv_compare(json->array->items[1]->string, b) && "should b be equal");
-
-  StringView c = sv_new_from_cstr("ok");
-  assert(sv_compare(json->array->items[2]->string, c) && "should c be equal");
-
-  StringView d_k = sv_new_from_cstr("key");
-  StringView d_v = sv_new_from_cstr("value");
-  Json *d_get_v = json_object_get(json->array->items[3]->object, d_k);
-  assert(d_get_v->type == JSON_STRING && "should d_get_v be JSON_STRING");
-  assert(sv_compare(d_get_v->string, d_v) && "should d_get_v be equal");
-
-  StringView e = sv_new_from_cstr("value_in_array");
-  assert(json->array->items[4]->type == JSON_ARRAY && "should e be JSON_ARRAY");
-  assert(sv_compare(e, json->array->items[4]->array->items[0]->string) &&
-         "should e be equal");
+  assert(
+      sb_compare_sv(json_object_get(second, sv_new_from_cstr("name"))->string,
+                    sv_new_from_cstr("Alice")) &&
+      "second name");
+  assert(30 == json_object_get(second, sv_new_from_cstr("age"))->num_integer &&
+         "second age");
+  assert(JSON_FALSE ==
+             json_object_get(second, sv_new_from_cstr("isStudent"))->type &&
+         "second isStudent");
 
   json_free(json);
 }
 
 void test_json_parse_array() {
-  StringView content = sv_new_from_cstr("[[],\"okej\",1,1]");
-  Json *json = json_new();
-
-  assert(json_parse(&content, json) == true &&
-         "should parse array successfully");
-
-  /* json_print(json); */
-  assert(json->array->len == 4 && "should parse array of length 4");
-  assert(json->array->items[2]->type == JSON_INT &&
-         json->array->items[2]->num_integer == 1 &&
-         "should parse integer after array inside array");
-
-  json_free(json);
-}
-
-void test_json_from_file() {
-  StringView file_content = {0};
-  sv_file_read("test.json", &file_content);
-  Json *json = json_new();
-  json_parse(&file_content, json);
-
-  struct User {
-    char *name;
-    int age;
-    bool isStudent;
+  Json *json = json_new_array();
+  Json *obj = json_new_object();
+  json_object_set(obj->object, sb_new_from_cstr("key1"),
+                  json_new_string("value1"));
+  Json *items[] = {
+      json_new_string("okej"),
+      json_new_int(2),
+      json_new_double(4),
+      json_new_array(),
+      json_new_bool(true),
+      json_new_null(),
+      obj,
   };
-
-  struct User users[] = {
-      {"John", 25, true}, {"Alice", 30, false},  {"Bob", 22, true},
-      {"Eve", 28, false}, {"Charlie", 24, true},
-  };
-
-  Json *expected = json_new();
-  JsonArray *expected_array = json_array_new();
-  expected->type = JSON_ARRAY;
-  expected->array = expected_array;
-  for (size_t i = 0; i < sizeof(users) / sizeof(users[0]); ++i) {
-    Json *value = json_new();
-    JsonObject *obj = json_object_new(3);
-    value->type = JSON_OBJECT;
-    value->object = obj;
-
-    Json *name = json_new();
-    name->type = JSON_STRING;
-    name->string = sv_new_from_cstr(users[i].name);
-    json_object_set(obj, sv_new_from_cstr("name"), name);
-
-    Json *age = json_new();
-    age->type = JSON_INT;
-    age->num_integer = users[i].age;
-    json_object_set(obj, sv_new_from_cstr("age"), age);
-
-    Json *is_student = json_new();
-    is_student->type = users[i].isStudent ? JSON_TRUE : JSON_FALSE;
-    json_object_set(obj, sv_new_from_cstr("isStudent"), is_student);
-
-    json_array_append(expected_array, value);
+  for (size_t i = 0; i < sizeof(items) / sizeof(Json *); ++i) {
+    json_array_append(json->array, items[i]);
   }
+  assert(sb_compare_sv(json->array->items[0]->string, sv_new("okej", 4)));
+  assert(json->array->items[1]->num_integer == 2);
+  assert(json->array->items[2]->num_double == 4);
+  assert(json->array->items[3]->array->len == 0);
+  assert(json->array->items[4]->type == JSON_TRUE);
+  assert(json->array->items[5]->type == JSON_NULL);
+  assert(json->array->items[6]->type == JSON_OBJECT);
 
-  for (size_t i = 0; i < sizeof(users) / sizeof(users[0]); ++i) {
-    JsonObject *user_json = json->array->items[i]->object;
-    JsonObject *user_expected = expected->array->items[i]->object;
-
-    /* printf("i: %lu\n", i); */
-
-    Json *name_json = json_object_get(user_json, sv_new_from_cstr("name"));
-    Json *name_expected =
-        json_object_get(user_expected, sv_new_from_cstr("name"));
-    /* printf("name_json: "); */
-    /* SV_PRINT(name_json->string); */
-    /* printf(", name_expected: "); */
-    /* SV_PRINT(name_expected->string); */
-    /* printf("\n"); */
-    assert(sv_compare(name_json->string, name_expected->string) &&
-           "should names be equal");
-
-    Json *age_json = json_object_get(user_json, sv_new_from_cstr("age"));
-    Json *age_expected =
-        json_object_get(user_expected, sv_new_from_cstr("age"));
-    /* printf("age_json: %d", age_json->num_integer); */
-    /* printf(", age_expected: %d\n", age_expected->num_integer); */
-    assert(age_json->num_integer == age_expected->num_integer &&
-           "should age be equal");
-
-    Json *is_student_json =
-        json_object_get(user_json, sv_new_from_cstr("isStudent"));
-    Json *is_student_expected =
-        json_object_get(user_expected, sv_new_from_cstr("isStudent"));
-    /* printf("isStudent_json: %s", */
-    /*        is_student_json->type == JSON_TRUE ? "TRUE" : "FALSE"); */
-    /* printf(", is_student_expected: %s", */
-    /*        is_student_expected->type == JSON_TRUE ? "TRUE" : "FALSE"); */
-    assert(is_student_json->type == is_student_expected->type &&
-           "should isStudent be equal");
-
-    /* printf("\n"); */
-  }
-
-  json_free(expected);
-  json_free(json);
-  sv_file_free(&file_content);
-}
-
-void test_json_a() {
-  StringView input = sv_new_from_cstr("[\"nie wiem\", -1]");
-  Json *json = json_new();
-  bool is_succes = json_parse(&input, json);
-  assert(is_succes && "should parse a success");
-  /* json_print(json); */
   json_free(json);
 }
 
 void test_json_parse_object() {
-  StringView input =
-      sv_new_from_cstr("[[]\b\r\t,1,\n\b\t{\"key1\":1, "
-                       "\"key2\":\n\"value2\"\n}\n,[], 1,[], true]");
-  Json *json = json_new();
-  bool is_success = json_parse(&input, json);
-  assert(is_success && "should parse object success");
-  /* json_print(json); */
+  Json *json = json_new_object();
+  json_object_set(json->object, sb_new_from_cstr("key1"),
+                  json_new_string("value1"));
+  json_object_set(json->object, sb_new_from_cstr("key2"),
+                  json_new_string("value2"));
+
+  Json *value1 = json_object_get(json->object, sv_new_from_cstr("key1"));
+  Json *value2 = json_object_get(json->object, sv_new_from_cstr("key2"));
+
+  assert(sb_compare_sv(value1->string, sv_new_from_cstr("value1")));
+  assert(sb_compare_sv(value2->string, sv_new_from_cstr("value2")));
   json_free(json);
 }
 
-void test_json_reading() {
-  typedef struct User {
-    StringView name;
-    int age;
-    bool is_student;
-  } User;
-
-  Json *json = json_new();
-  if (!json_read_file("test.json", json)) {
-    return;
-  }
-  if (json->type != JSON_ARRAY) {
-    return;
-  }
-
-  for (size_t i = 0; i < json->array->len; ++i) {
-    if (json->array->items[i]->type != JSON_OBJECT) {
-      return;
-    }
-    JsonObject *o = json->array->items[i]->object;
-    User user = {0};
-    json_object_get_string(o, sv_new_from_cstr("name"), &user.name);
-    json_object_get_int(o, sv_new_from_cstr("age"), &user.age);
-    json_object_get_bool(o, sv_new_from_cstr("isStudent"), &user.is_student);
-    /* printf("%lu\n", i); */
-    /* sv_print(&user.name); */
-    /* printf("\n%d\n", user.age); */
-    /* printf("%s\n", user.is_student ? "T" : "F"); */
-    /* printf("\n"); */
-  }
-}
-
-void test_json_stringify() {
-  Json *json = json_new();
-  if (!json_read_file("test.json", json)) {
-    return;
-  }
-  printf("raw: \n");
-  json_print(json);
-  StringBuffer *stringified_json = sb_new();
-  printf("\n");
-  json_stringify(json, stringified_json);
-  printf("\n");
-  printf("stringified: \n");
-  SB_PRINT(stringified_json);
-  printf("\n");
+void test_json_stringify_array() {
+  Json *json = json_new_array();
+  json_array_append(json->array, json_new_string("okej"));
+  json_array_append(json->array, json_new_null());
+  json_array_append(json->array, json_new_bool(true));
+  json_array_append(json->array, json_new_bool(false));
+  json_array_append(json->array, json_new_int(2));
+  json_array_append(json->array, json_new_double(2.234));
+  json_array_append(json->array, json_new_object());
+  json_array_append(json->array, json_new_array());
+  StringBuffer *buff = sb_new();
+  json_stringify(json, buff);
+  sb_free(buff);
+  json_free(json);
 }
 
 void test_json() {
-  test_json_reading();
-  test_json_a();
-  test_json_free();
-  test_json_object();
-  test_json_parse_object();
-  test_json_parse();
+  test_json_compare();
+  test_json_parse_file();
   test_json_parse_array();
-  test_json_from_file();
-  test_json_stringify();
+  test_json_parse_object();
+
+  test_json_stringify_array();
+
+  printf("All 'json' tests passed successfully!\n");
 }

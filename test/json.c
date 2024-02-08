@@ -127,11 +127,34 @@ void test_json_stringify_array() {
   json_free(json);
 }
 
+void test_json_parse_array_fail() {
+  Json *json = json_new();
+  json_print(json);
+  StringBuffer *input = sb_new_from_cstr("[\"AB\",:]");
+  assert(!json_parse(input, json) && "test_json_parse_array_fail should fail");
+  sb_free(input);
+  json_free(json);
+}
+
+void test_json_parse_object_fail() {
+  Json *json = json_new();
+  json_print(json);
+  StringBuffer *input = sb_new_from_cstr("{\"key\"::");
+  assert(!json_parse(input, json) && "test_json_parse_object_fail should fail");
+  sb_free(input);
+  json_free(json);
+}
+
 void test_json() {
   test_json_compare();
+
   test_json_parse_file();
-  test_json_parse_array();
+
   test_json_parse_object();
+  test_json_parse_object_fail();
+
+  test_json_parse_array();
+  test_json_parse_array_fail();
 
   test_json_stringify_array();
 

@@ -5,12 +5,11 @@
 #include "logger.h"
 
 // TODO
-// change from StringView to StringBuffer
 // https://www.crockford.com/mckeeman.html
 // correct string parsing
 // numbers add: errors, +/-, hex
 // assert last char is valid
-// allocate json in json_parse(), json_free() does not work on json without type
+// CD json_stringify
 
 Lexer lexer_new(StringBuffer *input) {
   return (Lexer){
@@ -111,15 +110,12 @@ void json_free(Json *json) {
   switch (json->type) {
   case JSON_ARRAY:
     json_array_free(json->array);
-    free(json);
     break;
   case JSON_OBJECT:
     json_object_free(json->object);
-    free(json);
     break;
   case JSON_STRING:
     sb_free(json->string);
-    free(json);
     break;
   case JSON_INT:
   case JSON_DOUBLE:
@@ -127,11 +123,11 @@ void json_free(Json *json) {
   case JSON_FALSE:
   case JSON_NULL:
   case JSON_EMPTY:
-    free(json);
     break;
   default:
     logger_log(LOG_FATAL, "json_free invalid json type");
   }
+  free(json);
 }
 
 bool json_parse(StringBuffer *input, Json *dest) {
@@ -207,6 +203,7 @@ bool json_parse_value(Lexer *lexer, Json *dest) {
     return false;
   }
   }
+  return false;
 }
 
 bool json_parse_string(Lexer *lexer, Json *dest) {
@@ -222,62 +219,56 @@ bool json_parse_string(Lexer *lexer, Json *dest) {
 }
 
 bool json_parse_array(Lexer *lexer, Json *dest) {
-  JsonArray *array = json_array_new();
-  *dest = (Json){
-      .type = JSON_ARRAY,
-      .array = array,
-  };
   if (!lexer_eat(lexer, '[')) {
-    json_array_free(array);
     return false;
   }
+
+  JsonArray *array = json_array_new();
+  dest->type = JSON_ARRAY;
+  dest->array = array;
+
   lexer_skip_whitespace(lexer);
+
   if (lexer->ch == ']') {
-    lexer_eat(lexer, ']');
+    lexer_advance(lexer);
     return true;
   }
 
-  lexer_skip_whitespace(lexer);
+  while (true) {
+    lexer_skip_whitespace(lexer);
 
-  Json *append = json_new();
-  if (!json_parse_value(lexer, append)) {
-    json_free(append);
-    json_array_free(array);
-    return false;
-  }
-  json_array_append(array, append);
-  lexer_skip_whitespace(lexer);
-
-  while (lexer->ch == ',') {
-    if (!lexer_eat(lexer, ',')) {
-      json_array_free(array);
-      return false;
-    }
     Json *append = json_new();
     if (!json_parse_value(lexer, append)) {
       json_free(append);
+      return false;
+    }
+
+    json_array_append(array, append);
+
+    lexer_skip_whitespace(lexer);
+
+    if (lexer->ch == ',') {
+      lexer_advance(lexer);
+    } else if (lexer->ch == ']') {
+      lexer_advance(lexer);
+      return true;
+    } else {
       json_array_free(array);
       return false;
     }
-    json_array_append(array, append);
-    lexer_skip_whitespace(lexer);
   }
 
-  lexer_skip_whitespace(lexer);
-  if (!lexer_eat(lexer, ']')) {
-    json_array_free(array);
-    return false;
-  }
-
-  return true;
+  return false;
 }
 
 void json_array_free(JsonArray *a) {
-  for (size_t i = 0; i < a->len; ++i) {
-    json_free(a->items[i]);
+  if (a != NULL && a->items != NULL) {
+    for (size_t i = 0; i < a->len; ++i) {
+      json_free(a->items[i]);
+    }
+    free(a->items);
+    free(a);
   }
-  free(a->items);
-  free(a);
 }
 
 bool json_parse_object(Lexer *lexer, Json *dest) {
@@ -300,20 +291,17 @@ bool json_parse_object(Lexer *lexer, Json *dest) {
   while (true) {
     StringBuffer *key = lexer_read_string(lexer);
     if (key == NULL) {
-      json_object_free(object);
       return false;
     }
     lexer_skip_whitespace(lexer);
     if (!lexer_eat(lexer, ':')) {
       sb_free(key);
-      json_object_free(object);
       return false;
     }
     Json *value = json_new();
     if (value == NULL || !json_parse_value(lexer, value)) {
       sb_free(key);
       json_free(value);
-      json_object_free(object);
       return false;
     }
 
@@ -328,7 +316,6 @@ bool json_parse_object(Lexer *lexer, Json *dest) {
   }
 
   if (!lexer_eat(lexer, '}')) {
-    json_object_free(object);
     return false;
   }
 
@@ -432,6 +419,9 @@ void json_object_foreach(JsonObject *o,
 }
 
 void json_object_free(JsonObject *o) {
+  if (o == NULL) {
+    return;
+  }
   for (size_t i = 0; i < o->size; ++i) {
     JsonObjectPair *curr = o->buckets[i];
     while (curr != NULL) {
@@ -485,6 +475,8 @@ void json_print(Json *json) {
     break;
   case JSON_NULL:
     printf("null");
+    break;
+  case JSON_EMPTY:
     break;
   default:
     logger_log(LOG_FATAL, "json_print invalid type");

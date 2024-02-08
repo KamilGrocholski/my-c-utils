@@ -79,6 +79,25 @@ StringBuffer *lexer_read_ident(Lexer *lexer) {
   return sb_sub(lexer->input, start, end - 1);
 }
 
+bool is_letter(char ch) {
+  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
+}
+
+StringBuffer *lexer_read_name(Lexer *lexer) {
+  if (!lexer_eat(lexer, '"')) {
+    return NULL;
+  }
+  size_t start = lexer->idx;
+  while (is_letter(lexer->ch)) {
+    lexer_advance(lexer);
+  }
+  size_t end = lexer->idx;
+  if (!lexer_eat(lexer, '"')) {
+    return NULL;
+  }
+  return sb_sub(lexer->input, start, end - 1);
+}
+
 StringBuffer *lexer_read_string(Lexer *lexer) {
   if (!lexer_eat(lexer, '"')) {
     return NULL;
@@ -289,23 +308,23 @@ bool json_parse_object(Lexer *lexer, Json *dest) {
   }
 
   while (true) {
-    StringBuffer *key = lexer_read_string(lexer);
-    if (key == NULL) {
+    StringBuffer *name = lexer_read_name(lexer);
+    if (name == NULL) {
       return false;
     }
     lexer_skip_whitespace(lexer);
     if (!lexer_eat(lexer, ':')) {
-      sb_free(key);
+      sb_free(name);
       return false;
     }
     Json *value = json_new();
     if (value == NULL || !json_parse_value(lexer, value)) {
-      sb_free(key);
+      sb_free(name);
       json_free(value);
       return false;
     }
 
-    json_object_set(object, key, value);
+    json_object_set(object, name, value);
 
     lexer_skip_whitespace(lexer);
     if (lexer->ch != ',') {

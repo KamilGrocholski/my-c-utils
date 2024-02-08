@@ -1,4 +1,5 @@
 #include "uri.h"
+#include "logger.h"
 #include <stdlib.h>
 
 void uri_parse(StringView uri, UriComponents *components) {
@@ -86,11 +87,17 @@ size_t uri_query_hash(StringView key) {
 
 UriQueryPairs *uri_query_new() {
   UriQueryPairs *qp = malloc(sizeof(UriQueryPairs));
+  if (qp == NULL) {
+    logger_log(LOG_FATAL, "uri_query_new malloc err");
+  }
   *qp = (UriQueryPairs){
       .cap = URI_QUERY_CAP_INIT,
       .size = 0,
-      .buckets = malloc(sizeof(UriQueryBucket *) * URI_QUERY_CAP_INIT),
+      .buckets = calloc(URI_QUERY_CAP_INIT, sizeof(UriQueryBucket *)),
   };
+  if (qp->buckets == NULL) {
+    logger_log(LOG_FATAL, "uri_query_new bucckets calloc err");
+  }
   return qp;
 }
 
@@ -108,7 +115,10 @@ void uri_query_parse(UriQueryPairs *qp, StringView query) {
 }
 
 void uri_query_resize(UriQueryPairs *qp, size_t new_cap) {
-  UriQueryBucket **new_buckets = malloc(sizeof(UriQueryBucket *) * new_cap);
+  UriQueryBucket **new_buckets = calloc(new_cap, sizeof(UriQueryBucket *));
+  if (new_buckets == NULL) {
+    logger_log(LOG_FATAL, "uri_query_resize new_buckets calloc err");
+  }
 
   for (size_t i = 0; i < qp->cap; ++i) {
     UriQueryBucket *bucket = qp->buckets[i];
@@ -131,6 +141,9 @@ void uri_query_set(UriQueryPairs *qp, StringView key, StringView value) {
   size_t hash = uri_query_hash(key);
   size_t idx = hash % qp->cap;
   UriQueryBucket *new_bucket = malloc(sizeof(UriQueryBucket));
+  if (new_bucket == NULL) {
+    logger_log(LOG_FATAL, "uri_query_set new_bucket malloc err");
+  }
   *new_bucket = (UriQueryBucket){
       .next = qp->buckets[idx],
       .pair =
@@ -223,6 +236,9 @@ void uri_query_foreach(UriQueryPairs *qp,
 }
 
 void uri_query_free(UriQueryPairs *qp) {
+  if (qp == NULL) {
+    return;
+  }
   for (size_t i = 0; i < qp->cap; ++i) {
     UriQueryBucket *bucket = qp->buckets[i];
     while (bucket) {

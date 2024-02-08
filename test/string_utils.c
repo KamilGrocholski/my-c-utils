@@ -133,6 +133,7 @@ void test_sb_sub() {
   assert(sb_compare_sv(sub, sv_new_from_cstr("BCD")) &&
          "test_sb_sub failed compare");
   sb_free(sb);
+  sb_free(sub);
 }
 
 void test_sb_clear() {
@@ -158,6 +159,12 @@ void test_sb_remove() {
   sb_free(sb);
 }
 
+void test_sb_file_read() {
+  StringBuffer *sb = sb_new();
+  assert(sb_file_read("test.json", sb) && "test_sb_file_read fail");
+  sb_free(sb);
+}
+
 void test_string_utils() {
   test_sv_starts_with();
   test_sv_ends_with();
@@ -175,6 +182,7 @@ void test_string_utils() {
   test_sb_sub();
   test_sb_clear();
   test_sb_remove();
+  test_sb_file_read();
 
   printf("All 'string_utils' tests passed!\n");
 }

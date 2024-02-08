@@ -29,8 +29,9 @@ bool test_uri_parse() {
 }
 
 void test_uri_components_join(UriComponents *components, StringView expected) {
-  assert(sb_compare_sv(uri_components_join(components), expected) &&
-         "should join components");
+  StringBuffer *joined = uri_components_join(components);
+  assert(sb_compare_sv(joined, expected) && "should join components");
+  sb_free(joined);
 }
 
 void callback(StringView key, StringView value) {

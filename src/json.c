@@ -111,12 +111,15 @@ void json_free(Json *json) {
   switch (json->type) {
   case JSON_ARRAY:
     json_array_free(json->array);
+    free(json);
     break;
   case JSON_OBJECT:
     json_object_free(json->object);
+    free(json);
     break;
   case JSON_STRING:
     sb_free(json->string);
+    free(json);
     break;
   case JSON_INT:
   case JSON_DOUBLE:
@@ -164,32 +167,37 @@ bool json_parse_value(Lexer *lexer, Json *dest) {
           lexer_advance(lexer);
         }
         dest->type = JSON_DOUBLE;
-        dest->num_double =
-            atof(sb_sub(lexer->input, start, lexer->idx)->data); // TODO
+        StringBuffer *double_str = sb_sub(lexer->input, start, lexer->idx);
+        dest->num_double = atof(double_str->data);
+        sb_free(double_str);
       } else {
         dest->type = JSON_INT;
-        dest->num_integer =
-            atoi(sb_sub(lexer->input, start, lexer->idx)->data); // TODO
+        StringBuffer *int_str = sb_sub(lexer->input, start, lexer->idx);
+        dest->num_integer = atoi(int_str->data);
+        sb_free(int_str);
       }
       return true;
     } else if (is_alpha_lowercase(lexer->ch)) {
       StringBuffer *ident = lexer_read_ident(lexer);
       if (sb_compare_sv(ident, sv_new("null", 4))) {
         dest->type = JSON_NULL;
+        sb_free(ident);
         return true;
       } else if (sb_compare_sv(ident, sv_new("true", 4))) {
         dest->type = JSON_TRUE;
+        sb_free(ident);
         return true;
       } else if (sb_compare_sv(ident, sv_new("false", 5))) {
         dest->type = JSON_FALSE;
+        sb_free(ident);
         return true;
       } else {
+        sb_free(ident);
         logger_log(
             LOG_ERROR,
             "JSON_PARSE invalid keyword '%.*s' at line %lu on offset %lu",
             ident->len, ident->data, lexer->location.line,
             lexer->location.offset);
-        sb_free(ident);
         return false;
       }
     }
@@ -289,48 +297,38 @@ bool json_parse_object(Lexer *lexer, Json *dest) {
     return true;
   }
 
-  StringBuffer *key = lexer_read_string(lexer);
-  if (!key) {
-    return false;
-  }
-  lexer_skip_whitespace(lexer);
-  if (!lexer_eat(lexer, ':')) {
-    sb_free(key);
-    return false;
-  }
-  Json *value = json_new();
-  if (!json_parse_value(lexer, value)) {
-    json_free(value);
-    return false;
-  }
-
-  json_object_set(object, key, value);
-
-  lexer_skip_whitespace(lexer);
-
-  while (lexer->ch == ',') {
-    lexer_advance(lexer);
-    lexer_skip_whitespace(lexer);
-    key = lexer_read_string(lexer);
-    if (!key) {
+  while (true) {
+    StringBuffer *key = lexer_read_string(lexer);
+    if (key == NULL) {
+      json_object_free(object);
       return false;
     }
     lexer_skip_whitespace(lexer);
     if (!lexer_eat(lexer, ':')) {
       sb_free(key);
+      json_object_free(object);
       return false;
     }
     Json *value = json_new();
-    if (!json_parse_value(lexer, value)) {
+    if (value == NULL || !json_parse_value(lexer, value)) {
+      sb_free(key);
       json_free(value);
+      json_object_free(object);
       return false;
     }
+
     json_object_set(object, key, value);
+
+    lexer_skip_whitespace(lexer);
+    if (lexer->ch != ',') {
+      break;
+    }
+    lexer_advance(lexer);
     lexer_skip_whitespace(lexer);
   }
 
-  lexer_skip_whitespace(lexer);
   if (!lexer_eat(lexer, '}')) {
+    json_object_free(object);
     return false;
   }
 
@@ -438,6 +436,7 @@ void json_object_free(JsonObject *o) {
     JsonObjectPair *curr = o->buckets[i];
     while (curr != NULL) {
       JsonObjectPair *next = curr->next;
+      sb_free(curr->key);
       json_free(curr->value);
       free(curr);
       curr = next;

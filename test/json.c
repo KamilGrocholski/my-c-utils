@@ -119,8 +119,10 @@ void test_json_stringify_array() {
   json_array_append(json->array, json_new_double(2.234));
   json_array_append(json->array, json_new_object());
   json_array_append(json->array, json_new_array());
+
   StringBuffer *buff = sb_new();
   json_stringify(json, buff);
+
   sb_free(buff);
   json_free(json);
 }

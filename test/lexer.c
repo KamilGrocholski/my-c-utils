@@ -11,6 +11,9 @@ void test_lexer_string() {
   assert(string->len == 5 && "test_lexer_string string len");
   assert(sb_compare_sv(string, sv_new_from_cstr("ABCDE")) &&
          "test_lexer_string string equal");
+
+  sb_free(string);
+  sb_free(input);
 }
 
 void test_lexer() {
